@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "module": "None",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": false,
+    "types": ["chrome"]
+  },
+  "include": ["src/contentScript.ts", "src/background.ts"]
+}

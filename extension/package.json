@@ -1,0 +1,15 @@
+{
+  "name": "bavn-extension",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+  "build": "tsc -p tsconfig.content.json && tsc -p tsconfig.popup.json"
+},
+  "devDependencies": {
+    "@types/chrome": "^0.1.36",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.91.1"
+  }
+}
