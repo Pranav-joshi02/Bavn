@@ -17,18 +17,43 @@ export async function routes(app: FastifyInstance) {
 
       const { questions } = req.body;
 
-      const answers = await askGroq(questions);
+     const userId = req.user.id;
+const answers: string[] = [];
 
-      // save memory
-      const rows = questions.map((q: string, i: number) => ({
-        user_id: req.user.id,
-        question: q,
-        answer: answers[i]
-      }));
+for (const q of questions) {
 
-      await supabase.from("answers").insert(rows);
+  // 1️⃣ check memory first
+  const { data } = await supabase
+    .from("answers")
+    .select("answer")
+    .eq("user_id", userId)
+    .ilike("question", `%${q.slice(0, 40)}%`)
+    .limit(1);
 
-      return { answers };
+  if (data && data.length > 0) {
+
+    // ✅ reuse old answer
+    answers.push(data[0].answer);
+
+  } else {
+
+    // 🤖 ask AI
+    const ai = await askGroq([q]);
+    const ans = ai[0] || "";
+
+    answers.push(ans);
+
+    // 💾 save new memory
+    await supabase.from("answers").insert({
+      user_id: userId,
+      question: q,
+      answer: ans
+    });
+  }
+}
+
+return { answers };
+
     }
   );
 

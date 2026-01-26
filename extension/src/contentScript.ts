@@ -1,14 +1,14 @@
 console.log("✅ BAVN content script loaded");
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg) => {
   console.log("📩 Message received in content script:", msg);
 
   if (msg.action === "OPEN_SIDEBAR") {
-    console.log("🚀 Opening sidebar");
     openSidebar();
   }
 });
 
+// ================== SIDEBAR ==================
 
 function openSidebar() {
 
@@ -27,21 +27,27 @@ function openSidebar() {
     color: "white",
     zIndex: "999999",
     padding: "12px",
-    overflowY: "auto"
+    overflowY: "auto",
+    boxShadow: "0 0 12px rgba(0,0,0,0.6)"
   });
 
+  // ✅ ADD UI
   sidebar.innerHTML = `
-    <h3>BAVN.io Assistant</h3>
+    <h3 style="margin-bottom:10px">BAVN.io Assistant</h3>
     <div id="bavn-qa"></div>
-    <button id="bavn-fill">Autofill</button>
+    <button id="bavn-ai" style="width:100%;margin-top:6px">🤖 Get AI Answers</button>
+    <button id="bavn-fill" style="width:100%;margin-top:6px">⚡ Autofill</button>
   `;
 
   document.body.appendChild(sidebar);
 
   loadQuestions();
 
-  document.getElementById("bavn-fill")!.onclick = autofillForm;
+  document.getElementById("bavn-ai")!.addEventListener("click", getAIAnswers);
+  document.getElementById("bavn-fill")!.addEventListener("click", autofillForm);
 }
+
+// ================== QUESTIONS ==================
 
 function loadQuestions() {
 
@@ -50,18 +56,53 @@ function loadQuestions() {
 
   const blocks = document.querySelectorAll<HTMLElement>(".Qr7Oae");
 
-  blocks.forEach((b, i) => {
+  blocks.forEach((block, index) => {
 
     const q =
-      b.querySelector(".M7eMe")?.textContent?.trim() ||
-      `Question ${i + 1}`;
+      block.querySelector(".M7eMe")?.textContent?.trim() ||
+      `Question ${index + 1}`;
 
     qa.innerHTML += `
-      <p style="font-size:13px">${q}</p>
-      <textarea data-i="${i}" style="width:100%;margin-bottom:8px"></textarea>
+      <p style="font-size:13px;margin-bottom:4px">${q}</p>
+      <textarea data-index="${index}"
+        style="width:100%;border-radius:8px;padding:6px;margin-bottom:10px"></textarea>
     `;
   });
 }
+
+// ================== AI CALL ==================
+
+async function getAIAnswers() {
+
+  const session = await new Promise<any>((resolve) => {
+    chrome.storage.local.get(["session"], (res) => resolve(res.session));
+  });
+
+  if (!session?.access_token) {
+    alert("Please login first from extension popup.");
+    return;
+  }
+
+  const questions = Array.from(
+    document.querySelectorAll("#bavn-qa p")
+  ).map(p => p.textContent || "");
+
+  const res = await fetch("http://localhost:4000/api/answers", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${session.access_token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ questions })
+  });
+
+  const data = await res.json();
+
+  document.querySelectorAll<HTMLTextAreaElement>("#bavn-qa textarea")
+    .forEach((t, i) => t.value = data.answers?.[i] || "");
+}
+
+// ================== AUTOFILL ==================
 
 function autofillForm() {
 
@@ -83,5 +124,5 @@ function autofillForm() {
       }
     });
 
-  alert("Autofilled!");
+  alert("Form autofilled ✅");
 }
