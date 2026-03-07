@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAVN</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #080b0f; --surface: #0e1318; --surface2: #141b23;
+    --border: #1e2a35; --accent: #00e5ff; --green: #7dff6b;
+    --text: #e8f0f7; --muted: #4a6070;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; }
+
+  /* ── LOGIN VIEW ── */
+  #login-view {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100vh; gap: 20px; padding: 32px;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800;
+    background: linear-gradient(135deg, #00e5ff, #0088aa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .tagline { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  #login-status { font-size: 11px; color: var(--muted); min-height: 16px; }
+
+  /* ── APP VIEW ── */
+  #app-view { display: none; flex-direction: column; height: 100vh; }
+
+  /* ── HEADER ── */
+  .header { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  .logo-sm { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800;
+    background: linear-gradient(135deg, #00e5ff, #0088aa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .btn-sm { background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 4px; padding: 4px 10px; font-size: 10px; cursor: pointer;
+    font-family: 'DM Mono', monospace; letter-spacing: 1px; transition: color 0.2s; }
+  .btn-sm:hover { color: var(--text); }
+
+  /* ── TABS ── */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  .tab { flex: 1; padding: 10px; text-align: center; font-size: 11px; letter-spacing: 1.5px;
+    text-transform: uppercase; cursor: pointer; color: var(--muted);
+    border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s;
+    background: none; border-top: none; border-left: none; border-right: none; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── PANELS ── */
+  .panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .panel.active { display: flex; }
+  .scroll { flex: 1; overflow-y: auto; padding: 14px; }
+  .scroll::-webkit-scrollbar { width: 4px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* ── AUTOFILL ── */
+  .url-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px; font-size: 10px; color: var(--muted); margin-bottom: 12px;
+    word-break: break-all; line-height: 1.4; }
+  .question-list { display: flex; flex-direction: column; gap: 8px; }
+  .q-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .q-card.filled { border-color: rgba(125,255,107,0.3); }
+  .q-card.from-memory { border-color: rgba(0,229,255,0.25); }
+  .q-label { padding: 10px 14px 4px; font-size: 10px; color: var(--muted); line-height: 1.4; }
+  .q-answer { padding: 0 14px 10px; font-size: 12px; color: var(--text); line-height: 1.5; }
+  .q-answer.empty { color: var(--muted); font-style: italic; }
+  .q-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase; margin: 0 14px 6px; width: fit-content; }
+  .q-badge.memory { background: rgba(0,229,255,0.1); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
+  .q-badge.generated { background: rgba(125,255,107,0.1); color: var(--green); border: 1px solid rgba(125,255,107,0.2); }
+  .empty-state { text-align: center; color: var(--muted); font-size: 12px; padding: 40px 20px; line-height: 1.8; }
+  .empty-icon { font-size: 28px; margin-bottom: 10px; }
+
+  /* ── FOOTER ── */
+  .footer { padding: 12px 14px; border-top: 1px solid var(--border);
+    background: var(--surface); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+
+  /* ── BUTTONS ── */
+  .btn { width: 100%; padding: 11px; border-radius: 8px; border: none;
+    font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer;
+    transition: opacity 0.2s; letter-spacing: 0.5px; }
+  .btn:hover:not(:disabled) { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #080b0f; font-weight: 500; }
+  .btn-fill    { background: var(--green);  color: #080b0f; font-weight: 500; }
+  .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-google  { background: #fff; color: #1a1a1a; display: flex; align-items: center;
+    justify-content: center; gap: 10px; }
+
+  .status-bar { font-size: 10px; color: var(--muted); text-align: center; min-height: 14px; }
+  .status-bar.error   { color: #ff6b6b; }
+  .status-bar.success { color: var(--green); }
+
+  /* ── MEMORY ── */
+  .memory-list { display: flex; flex-direction: column; gap: 8px; }
+  .mem-card { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; position: relative; }
+  .mem-q { font-size: 10px; color: var(--muted); line-height: 1.4; margin-bottom: 4px; }
+  .mem-a { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .mem-meta { font-size: 9px; color: #2a3a45; margin-top: 6px; }
+  .mem-del { position: absolute; top: 10px; right: 10px; background: none; border: none;
+    color: var(--muted); cursor: pointer; font-size: 16px; transition: color 0.2s; }
+  .mem-del:hover { color: #ff6b6b; }
+
+  /* ── PROFILE ── */
+  .profile-form { display: flex; flex-direction: column; gap: 12px; }
+  .field-group { display: flex; flex-direction: column; gap: 4px; }
+  .field-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .field-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 12px; outline: none; transition: border-color 0.2s; resize: vertical; width: 100%; }
+  .field-input:focus { border-color: var(--accent); }
+
+  /* ── SKELETON ── */
+  .skeleton { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .privacy-note { font-size:10px; color:#4a6070; background:#0e1318; border:1px solid #1e2a35; border-radius:6px; padding:10px 12px; line-height:1.6; margin-bottom:4px; }
+  .field-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .toggle-wrap { display:flex; align-items:center; gap:5px; cursor:pointer; }
+  .toggle-wrap input[type="checkbox"] { width:14px; height:14px; accent-color:#00e5ff; cursor:pointer; }
+  .toggle-label { font-size:9px; color:#4a6070; letter-spacing:1px; text-transform:uppercase; }
+  .toggle-wrap:has(input:checked) .toggle-label { color:#00e5ff; }
+  .learn-intro { font-size:11px; color:var(--muted); background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; line-height:1.6; margin-bottom:12px; }
+  .learn-list { display:flex; flex-direction:column; gap:10px; }
+  .learn-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .learn-card.saved { border-color:rgba(125,255,107,0.4); }
+  .learn-q { padding:10px 14px 4px; font-size:10px; color:var(--muted); line-height:1.4; }
+  .learn-a { padding:0 14px 4px; }
+  .learn-a textarea { width:100%; background:transparent; border:none; color:var(--text); font-family:"DM Mono",monospace; font-size:12px; line-height:1.5; resize:vertical; outline:none; padding:4px 0 8px; min-height:60px; }
+  .learn-actions { display:flex; gap:8px; padding:0 14px 10px; }
+  .btn-save-learn { background:rgba(125,255,107,0.1); border:1px solid rgba(125,255,107,0.3); color:var(--green); border-radius:6px; padding:5px 12px; font-size:11px; font-family:"DM Mono",monospace; cursor:pointer; transition:opacity 0.2s; }
+  .btn-save-learn:hover { opacity:0.8; }
+  .btn-discard { background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:5px 12px; font-size:11px; font-family:"DM Mono",monospace; cursor:pointer; }
+  .saved-badge { font-size:9px; color:var(--green); letter-spacing:1px; padding:0 14px 8px; }
+  .manual-form { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px; display:flex; flex-direction:column; gap:8px; }
+  .manual-form textarea, .manual-form input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-family:"DM Mono",monospace; font-size:12px; outline:none; resize:vertical; }
+  .manual-form textarea:focus, .manual-form input:focus { border-color:var(--accent); }
+  .manual-label { font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="login-view">
+  <div class="logo">BAVN</div>
+  <div class="tagline">AI Form Filler</div>
+  <button class="btn btn-google" id="btn-login" style="width:100%;max-width:260px;">
+    <svg width="18" height="18" viewBox="0 0 18 18">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+      <path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/>
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+    </svg>
+    Continue with Google
+  </button>
+  <div id="login-status"></div>
+</div>
+
+<!-- APP VIEW -->
+<div id="app-view">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-sm">BAVN</div>
+    <button class="btn-sm" id="btn-logout">Sign out</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="autofill">Autofill</button>
+    <button class="tab" data-tab="memory">Memory</button>
+    <button class="tab" data-tab="profile">Profile</button>
+    <button class="tab" data-tab="learn">Learn</button>
+  </div>
+
+  <!-- Autofill Panel -->
+  <div class="panel active" id="panel-autofill">
+    <div class="scroll">
+      <div class="url-badge" id="current-url">Scanning page…</div>
+      <div id="question-list" class="question-list">
+        <div class="skeleton" style="height:70px"></div>
+        <div class="skeleton" style="height:70px"></div>
+        <div class="skeleton" style="height:70px"></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="status-bar" id="autofill-status"></div>
+      <button class="btn btn-primary" id="btn-generate">✦ Generate Answers</button>
+      <button class="btn btn-fill"    id="btn-fill" disabled>↓ Fill All Fields</button>
+      <button class="btn btn-outline" id="btn-rescan">↺ Rescan Page</button>
+    </div>
+  </div>
+
+  <!-- Memory Panel -->
+  <div class="panel" id="panel-memory">
+    <div class="scroll">
+      <div id="memory-list" class="memory-list">
+        <div class="skeleton" style="height:80px"></div>
+        <div class="skeleton" style="height:80px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Learn Panel -->
+  <div class="panel" id="panel-learn">
+    <div class="scroll">
+      <div class="learn-intro">BAVN can learn from answers you typed manually. Read the current page or add an answer manually.</div>
+      <div id="learn-list" class="learn-list"></div>
+    </div>
+    <div class="footer">
+      <div class="status-bar" id="learn-status"></div>
+      <button class="btn btn-primary" id="btn-read-page">↑ Read answers from page</button>
+      <button class="btn btn-outline" id="btn-add-manual">+ Add manually</button>
+    </div>
+  </div>
+
+  <!-- Profile Panel -->
+  <div class="panel" id="panel-profile">
+    <div class="scroll">
+      <div class="profile-form" id="profile-form">
+        <div class="skeleton" style="height:40px"></div>
+        <div class="skeleton" style="height:40px"></div>
+        <div class="skeleton" style="height:40px"></div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="status-bar" id="profile-status"></div>
+      <div id="privacy-summary" style="font-size:10px;text-align:center;min-height:14px;margin-bottom:4px;"></div>
+      <div class="status-bar" id="profile-status"></div>
+      <button class="btn btn-primary" id="btn-save-profile">Save Profile</button>
+    </div>
+  </div>
+</div>
+
+<script src="sidebar.js"></script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAVN.io</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 320px;
+    min-height: 280px;
+    background: #080b0f;
+    color: #e8f0f7;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 24px;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #00e5ff, #0088aa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    font-size: 10px;
+    color: #4a6070;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: -16px;
+  }
+
+  /* Logged OUT state */
+  #login-view { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; }
+
+  .btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 20px;
+    background: #fff;
+    color: #1a1a1a;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-google:hover { opacity: 0.88; }
+  .btn-google svg { flex-shrink: 0; }
+
+  /* Logged IN state */
+  #dashboard-view {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .user-name { font-size: 14px; font-weight: 500; color: #e8f0f7; }
+  .user-email { font-size: 10px; color: #4a6070; }
+
+  .btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    letter-spacing: 0.5px;
+  }
+  .btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-primary  { background: #00e5ff; color: #080b0f; font-weight: 500; }
+  .btn-outline  { background: transparent; color: #8aa0b0; border: 1px solid #1e2a35; }
+
+  .status { font-size: 11px; color: #4a6070; text-align: center; min-height: 16px; }
+  .status.error { color: #ff6b6b; }
+  .status.success { color: #7dff6b; }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #1e2a35;
+    border-top-color: #00e5ff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="logo">BAVN</div>
+<div class="tagline">AI Form Filler</div>
+
+<!-- Logged out -->
+<div id="login-view">
+  <button class="btn-google" id="btn-login">
+    <svg width="18" height="18" viewBox="0 0 18 18">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+      <path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/>
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+    </svg>
+    Continue with Google
+  </button>
+  <div class="status" id="login-status"></div>
+</div>
+
+<!-- Logged in -->
+<div id="dashboard-view">
+  <div class="user-info">
+    <div class="user-name" id="user-name">—</div>
+    <div class="user-email" id="user-email">—</div>
+  </div>
+  <button class="btn btn-primary" id="btn-open-sidebar">Open Sidebar on Page</button>
+  <button class="btn btn-outline" id="btn-logout">Sign Out</button>
+  <div class="status" id="dash-status"></div>
+</div>
+
+<div class="spinner" id="spinner"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>

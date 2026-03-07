@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "BAVN.io — AI Form Filler",
+  "version": "1.0.0",
+  "description": "AI-powered autofill with cloud memory. Fill any form instantly.",
+
+  "permissions": [
+    "identity",
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "sidePanel"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "src/background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "side_panel": {
+    "default_path": "src/sidebar.html"
+  },
+
+  "action": {},
+
+  "web_accessible_resources": [
+    {
+      "resources": ["src/sidebar.html", "arc/sidebar.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

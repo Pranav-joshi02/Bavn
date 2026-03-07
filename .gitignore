@@ -1,0 +1,12 @@
+# Backend dependencies and secrets
+backend/node_modules/
+backend/.env
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Extension build artifacts
+*.crx
+*.pem
