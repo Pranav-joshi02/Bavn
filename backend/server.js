@@ -1,5 +1,5 @@
 // ============================================
-// BAVN.io — server.js  (Fastify entry point)
+// BAVN.io — server.js
 // ============================================
 import 'dotenv/config'
 import Fastify from 'fastify'
@@ -7,19 +7,23 @@ import cors from '@fastify/cors'
 
 import { authMiddleware } from './middleware/auth.js'
 import answersRoute from './routes/answers.js'
-import memoryRoute from './routes/memory.js'
+import memoryRoute  from './routes/memory.js'
 import profileRoute from './routes/profile.js'
 
 const app = Fastify({ logger: true })
 
-// ── CORS (allow Chrome extension origin) ──
+// ── CORS — allow all origins (Chrome extension needs this) ──
 await app.register(cors, {
-  origin: true,          // tighten to your extension ID in production
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: (origin, cb) => {
+    // Allow requests with no origin (curl, Postman) and all chrome-extension:// origins
+    cb(null, true)
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 })
 
-// ── Auth hook — runs before every route ───
+// ── Auth hook ──────────────────────────────
 app.addHook('preHandler', authMiddleware)
 
 // ── Routes ────────────────────────────────
