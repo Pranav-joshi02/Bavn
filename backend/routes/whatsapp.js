@@ -175,18 +175,7 @@ export async function handleMessage(userId, phone, text) {
     sess.newAccountLabel = msg
     sess.state = 'awaiting_link_auth'
 
-    // Generate OAuth link token
-    const { data: tokenRow } = await supabase
-      .from('account_link_tokens')
-      .insert({
-        token:      crypto(),
-        user_id:    userId,
-        phone,
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString()
-      })
-      .select().single()
-
-    // Create a simple token
+    // Generate token
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36)
     await supabase.from('account_link_tokens').insert({
       token, user_id: userId, phone,
@@ -556,9 +545,8 @@ async function connectWhatsApp() {
 // Clear corrupted/expired session files
 async function clearSession() {
   try {
-    const fs   = await import('fs')
-    const path = await import('path')
-    const dir  = './whatsapp-session'
+    const { default: fs } = await import('fs')
+    const dir = './whatsapp-session'
     if (fs.existsSync(dir)) {
       fs.rmSync(dir, { recursive: true, force: true })
       console.log('[BAVN WA] Session cleared ✓')
@@ -689,7 +677,7 @@ poll()
     return reply.send({ success: true, message: 'Session reset — new QR generating in ~5 seconds' })
   })
 
-
+  app.post('/whatsapp/send', async (req, reply) => {
     const { phone, message } = req.body
     if (!isConnected) return reply.code(503).send({ error: 'WhatsApp not connected' })
     try {
@@ -698,4 +686,5 @@ poll()
     } catch(err) {
       return reply.code(500).send({ error: err.message })
     }
-  }
+  })
+}
