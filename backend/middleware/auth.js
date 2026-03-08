@@ -14,6 +14,7 @@ const supabase = createClient(
 const PUBLIC_ROUTES = [
   '/health',
   '/api/whatsapp/qr',
+  '/api/whatsapp/qr-page',
   '/api/whatsapp/status',
   '/link',
   '/link/callback',
@@ -38,7 +39,7 @@ export async function authMiddleware(req, reply) {
 
   // Attach user to request for use in route handlers
   req.user = {
-    id: data.user.id,
+    id:    data.user.id,
     email: data.user.email,
   }
 }
