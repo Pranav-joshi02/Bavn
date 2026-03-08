@@ -444,7 +444,11 @@ async function connectWhatsApp() {
     const useMultiFileAuthState = baileys.useMultiFileAuthState
     const DisconnectReason      = baileys.DisconnectReason
 
+    console.log('[BAVN WA] Baileys imported ✓')
+
     const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-session')
+
+    console.log('[BAVN WA] Auth state loaded ✓')
 
     sock = makeWASocket({
       auth:                  state,
@@ -455,10 +459,23 @@ async function connectWhatsApp() {
       syncFullHistory:       false,
       markOnlineOnConnect:   false,
       retryRequestDelayMs:   2000,
+      browser:               ['BAVN', 'Chrome', '4.0.0'],
     })
+
+    console.log('[BAVN WA] Socket created ✓')
+
+    // QR timeout — if no QR in 30s, log and retry
+    const qrTimeout = setTimeout(() => {
+      if (!qrCode && !isConnected) {
+        console.log('[BAVN WA] No QR received in 30s — retrying...')
+        try { sock?.end() } catch(e) {}
+        setTimeout(connectWhatsApp, 2000)
+      }
+    }, 30_000)
 
     sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
+        clearTimeout(qrTimeout)
         qrCode      = qr
         isConnected = false
         waReady     = true
@@ -466,6 +483,7 @@ async function connectWhatsApp() {
       }
 
       if (connection === 'open') {
+        clearTimeout(qrTimeout)
         isConnected = true
         waReady     = true
         qrCode      = null
@@ -562,7 +580,22 @@ setTimeout(connectWhatsApp, 2000)
 // ── Route handlers ────────────────────────
 export default async function whatsappRoute(app) {
 
-  // ── GET /whatsapp/qr-page — standalone browser QR page ──
+  // ── GET /whatsapp/qr-image — server-rendered QR as PNG ──
+  app.get('/whatsapp/qr-image', async (req, reply) => {
+    if (!qrCode) return reply.code(404).send('QR not ready')
+    try {
+      const QRCode = await import('qrcode')
+      const png = await QRCode.default.toBuffer(qrCode, {
+        type: 'png', width: 300, margin: 2,
+        color: { dark: '#006d77', light: '#ffffff' }
+      })
+      return reply.type('image/png').send(png)
+    } catch(e) {
+      return reply.code(500).send('QR render failed')
+    }
+  })
+
+  // ── GET /whatsapp/qr-page ──────────────────
   app.get('/whatsapp/qr-page', async (req, reply) => {
     return reply.type('text/html').send(`<!DOCTYPE html>
 <html>
@@ -626,12 +659,8 @@ async function poll() {
     }
 
     if (data.qr) {
-      box.innerHTML = '<div id="qr-render"></div>'
-      new QRCode(document.getElementById('qr-render'), {
-        text: data.qr, width: 200, height: 200,
-        colorDark: '#006d77', colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
-      })
+      // Use server-rendered PNG — no JS library needed
+      box.innerHTML = '<img src="' + BASE + '/api/whatsapp/qr-image?t=' + Date.now() + '" style="border:1px solid #c8e6ea;max-width:200px" alt="QR Code">'
       status.textContent = 'Scan with WhatsApp now ↑'
       status.className   = 'status ok'
       timer = setTimeout(poll, 5000)

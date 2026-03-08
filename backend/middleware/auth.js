@@ -14,6 +14,7 @@ const supabase = createClient(
 const PUBLIC_ROUTES = [
   '/health',
   '/api/whatsapp/qr',
+  '/api/whatsapp/qr-image',
   '/api/whatsapp/qr-page',
   '/api/whatsapp/status',
   '/api/whatsapp/reset',
