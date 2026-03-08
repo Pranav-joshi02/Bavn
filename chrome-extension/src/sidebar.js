@@ -462,3 +462,95 @@ document.getElementById('btn-add-manual').addEventListener('click', () => {
     }
   })
 })
+
+// ── WHATSAPP TAB ──────────────────────────
+const API_BASE_PUBLIC = 'https://bavn-backend.onrender.com'
+
+async function loadWhatsApp() {
+  const statusEl = document.getElementById('wa-status')
+  setStatus(statusEl, 'Checking connection...')
+  try {
+    const res  = await fetch(`${API_BASE_PUBLIC}/api/whatsapp/status`)
+    const data = await res.json()
+    if (data.connected) {
+      showWAConnected()
+      setStatus(statusEl, 'WhatsApp connected ✓', 'success')
+    } else {
+      showWADisconnected()
+      await loadQR()
+    }
+  } catch (err) {
+    setStatus(statusEl, 'Could not reach server', 'error')
+  }
+}
+
+async function loadQR() {
+  const statusEl = document.getElementById('wa-status')
+  const qrWrap   = document.getElementById('wa-qr-wrap')
+  const qrLoad   = document.getElementById('wa-qr-loading')
+
+  try {
+    const res  = await fetch(`${API_BASE_PUBLIC}/api/whatsapp/qr`)
+    const data = await res.json()
+
+    if (data.connected) { showWAConnected(); return }
+
+    if (data.qr) {
+      // Render QR using qrcode library via CDN
+      qrLoad.style.display = 'none'
+      qrWrap.style.display = 'block'
+      const canvas = document.getElementById('wa-qr-canvas')
+      // Use QRCode.js loaded in sidebar.html
+      if (window.QRCode) {
+        new window.QRCode(canvas, {
+          text:   data.qr,
+          width:  200,
+          height: 200,
+          colorDark:  '#07090c',
+          colorLight: '#ffffff',
+        })
+      } else {
+        qrWrap.innerHTML = `<div style="font-size:11px;color:var(--muted2);padding:20px;">QR received — open WhatsApp → Linked Devices → scan from terminal on server.</div>`
+        qrWrap.style.background = 'transparent'
+        qrWrap.style.display = 'block'
+      }
+      setStatus(statusEl, 'Scan QR with WhatsApp', 'success')
+      // Poll for connection
+      setTimeout(loadWhatsApp, 8000)
+    } else {
+      setStatus(statusEl, data.message || 'Waiting for QR...', '')
+      setTimeout(loadQR, 4000)
+    }
+  } catch (err) {
+    setStatus(statusEl, 'Error loading QR: ' + err.message, 'error')
+  }
+}
+
+function showWAConnected() {
+  document.getElementById('wa-connected-view').style.display = 'block'
+  document.getElementById('wa-disconnected-view').style.display = 'none'
+}
+
+function showWADisconnected() {
+  document.getElementById('wa-connected-view').style.display = 'none'
+  document.getElementById('wa-disconnected-view').style.display = 'block'
+}
+
+document.getElementById('btn-wa-refresh')?.addEventListener('click', async () => {
+  document.getElementById('wa-qr-wrap').style.display = 'none'
+  document.getElementById('wa-qr-loading').style.display = 'block'
+  document.getElementById('wa-qr-canvas').innerHTML = ''
+  await loadQR()
+})
+
+document.getElementById('btn-wa-disconnect')?.addEventListener('click', async () => {
+  showWADisconnected()
+  await loadQR()
+})
+
+// Load WhatsApp tab when clicked
+document.querySelectorAll('.tab').forEach(tab => {
+  if (tab.dataset.tab === 'whatsapp') {
+    tab.addEventListener('click', loadWhatsApp)
+  }
+})

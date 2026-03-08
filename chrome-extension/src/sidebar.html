@@ -138,6 +138,9 @@
   .manual-form textarea, .manual-form input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-family:"DM Mono",monospace; font-size:12px; outline:none; resize:vertical; }
   .manual-form textarea:focus, .manual-form input:focus { border-color:var(--accent); }
   .manual-label { font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+
+  #wa-qr-wrap canvas { max-width: 200px; width: 100%; height: auto; }
+
 </style>
 </head>
 <body>
@@ -172,6 +175,7 @@
     <button class="tab" data-tab="memory">Memory</button>
     <button class="tab" data-tab="profile">Profile</button>
     <button class="tab" data-tab="learn">Learn</button>
+    <button class="tab" data-tab="whatsapp">WhatsApp</button>
   </div>
 
   <!-- Autofill Panel -->
@@ -215,6 +219,60 @@
     </div>
   </div>
 
+  
+  <!-- WhatsApp Panel -->
+  <div class="panel" id="panel-whatsapp">
+    <div class="scroll">
+      <div id="wa-connected-view" style="display:none;">
+        <div style="text-align:center;padding:24px 0;">
+          <div style="font-size:40px;margin-bottom:12px;">✅</div>
+          <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--green);margin-bottom:8px;">WhatsApp Connected</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6;">Send any form link or review request to BAVN on WhatsApp and it will handle everything for you.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:8px;">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Try these commands</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">📋 Send a form URL → fills it</div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">⭐ "Review [place], [experience], [X] stars"</div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">🧠 "memory" → see saved answers</div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">❓ "help" → full command list</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;text-align:center;">
+          <button class="btn btn-outline" id="btn-wa-disconnect">Disconnect</button>
+        </div>
+      </div>
+
+      <div id="wa-disconnected-view">
+        <div style="text-align:center;padding:16px 0 24px;">
+          <div style="font-size:40px;margin-bottom:12px;">💬</div>
+          <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--text);margin-bottom:8px;">Connect WhatsApp</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.6;">Scan the QR code with your WhatsApp to connect BAVN bot to your account.</div>
+        </div>
+        <div id="wa-qr-wrap" style="display:none;text-align:center;padding:16px;background:white;border-radius:12px;margin-bottom:16px;">
+          <canvas id="wa-qr-canvas"></canvas>
+        </div>
+        <div id="wa-qr-loading" style="text-align:center;padding:24px;color:var(--muted);font-size:12px;">
+          <div class="skeleton" style="height:200px;margin-bottom:8px;"></div>
+          Loading QR code...
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">How to connect</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:11px;color:var(--muted2);">1. Open WhatsApp on your phone</div>
+            <div style="font-size:11px;color:var(--muted2);">2. Settings → Linked Devices</div>
+            <div style="font-size:11px;color:var(--muted2);">3. Link a Device → scan QR above</div>
+            <div style="font-size:11px;color:var(--muted2);">4. BAVN bot is now active ✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <div class="status-bar" id="wa-status"></div>
+      <button class="btn btn-primary" id="btn-wa-refresh">↻ Refresh QR</button>
+    </div>
+  </div>
+
   <!-- Profile Panel -->
   <div class="panel" id="panel-profile">
     <div class="scroll">
@@ -234,5 +292,6 @@
 </div>
 
 <script src="sidebar.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </body>
 </html>
