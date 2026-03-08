@@ -465,22 +465,71 @@ document.getElementById('btn-add-manual').addEventListener('click', () => {
 
 // ── WHATSAPP TAB ──────────────────────────
 const API_BASE_PUBLIC = 'https://bavn-backend.onrender.com'
+let waPolling = null
+
+// fetchWithTimeout — handles Render cold start (~30s)
+async function fetchWithTimeout(url, timeoutMs = 35000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timer)
+    return res
+  } catch (err) {
+    clearTimeout(timer)
+    throw err
+  }
+}
+
+// Render QR safely — wait for QRCode.js if not ready yet
+function renderQRCode(text) {
+  return new Promise((resolve, reject) => {
+    const attempt = (tries) => {
+      if (window.QRCode) {
+        const canvas = document.getElementById('wa-qr-canvas')
+        canvas.innerHTML = '' // clear old QR
+        try {
+          new window.QRCode(canvas, {
+            text,
+            width:      200,
+            height:     200,
+            colorDark:  '#006d77',
+            colorLight: '#ffffff',
+            correctLevel: window.QRCode.CorrectLevel.M
+          })
+          resolve()
+        } catch(e) { reject(e) }
+      } else if (tries > 0) {
+        setTimeout(() => attempt(tries - 1), 300)
+      } else {
+        reject(new Error('QRCode.js not loaded'))
+      }
+    }
+    attempt(10) // try up to 10x with 300ms gap = 3s max wait
+  })
+}
 
 async function loadWhatsApp() {
   const statusEl = document.getElementById('wa-status')
-  setStatus(statusEl, 'Checking connection...')
+  setStatus(statusEl, 'Checking connection…')
   try {
-    const res  = await fetch(`${API_BASE_PUBLIC}/api/whatsapp/status`)
+    const res  = await fetchWithTimeout(`${API_BASE_PUBLIC}/api/whatsapp/status`)
     const data = await res.json()
     if (data.connected) {
       showWAConnected()
-      setStatus(statusEl, 'WhatsApp connected ✓', 'success')
+      setStatus(statusEl, '● WhatsApp connected ✓', 'success')
     } else {
       showWADisconnected()
       await loadQR()
     }
   } catch (err) {
-    setStatus(statusEl, 'Could not reach server', 'error')
+    const msg = err.name === 'AbortError'
+      ? 'Server waking up… please wait ⏳'
+      : 'Could not reach server — is backend running?'
+    setStatus(statusEl, msg, 'error')
+    // Retry after 8s (Render cold start can take up to 30s)
+    if (waPolling) clearTimeout(waPolling)
+    waPolling = setTimeout(loadWhatsApp, 8000)
   }
 }
 
@@ -489,40 +538,62 @@ async function loadQR() {
   const qrWrap   = document.getElementById('wa-qr-wrap')
   const qrLoad   = document.getElementById('wa-qr-loading')
 
+  qrWrap.style.display = 'none'
+  qrLoad.style.display = 'block'
+  setStatus(statusEl, 'Loading QR code…')
+
   try {
-    const res  = await fetch(`${API_BASE_PUBLIC}/api/whatsapp/qr`)
+    const res  = await fetchWithTimeout(`${API_BASE_PUBLIC}/api/whatsapp/qr`)
     const data = await res.json()
 
-    if (data.connected) { showWAConnected(); return }
+    if (data.connected) {
+      showWAConnected()
+      setStatus(statusEl, '● WhatsApp connected ✓', 'success')
+      return
+    }
+
+    // Not ready yet — Baileys still booting
+    if (!data.ready) {
+      setStatus(statusEl, '⏳ WhatsApp bot initialising… (~10 sec)')
+      if (waPolling) clearTimeout(waPolling)
+      waPolling = setTimeout(loadQR, 4000)
+      return
+    }
 
     if (data.qr) {
-      // Render QR using qrcode library via CDN
-      qrLoad.style.display = 'none'
-      qrWrap.style.display = 'block'
-      const canvas = document.getElementById('wa-qr-canvas')
-      // Use QRCode.js loaded in sidebar.html
-      if (window.QRCode) {
-        new window.QRCode(canvas, {
-          text:   data.qr,
-          width:  200,
-          height: 200,
-          colorDark:  '#07090c',
-          colorLight: '#ffffff',
-        })
-      } else {
-        qrWrap.innerHTML = `<div style="font-size:11px;color:var(--muted2);padding:20px;">QR received — open WhatsApp → Linked Devices → scan from terminal on server.</div>`
-        qrWrap.style.background = 'transparent'
-        qrWrap.style.display = 'block'
+      try {
+        await renderQRCode(data.qr)
+        qrLoad.style.display = 'none'
+        qrWrap.style.display  = 'block'
+        setStatus(statusEl, 'Scan with WhatsApp → Linked Devices ✓', 'success')
+        // Poll every 5s until connected
+        if (waPolling) clearTimeout(waPolling)
+        waPolling = setTimeout(loadWhatsApp, 5000)
+      } catch(e) {
+        // QRCode.js failed — show raw string fallback
+        qrLoad.style.display = 'none'
+        qrWrap.style.display  = 'block'
+        qrWrap.innerHTML = `
+          <div style="font-size:10px;color:var(--muted2);padding:12px;line-height:1.8;text-align:left;">
+            QR ready but renderer failed.<br>
+            <b>Open your terminal</b> where the backend is running — the QR is printed there.<br><br>
+            Then: WhatsApp → Settings → Linked Devices → Link a Device
+          </div>`
+        setStatus(statusEl, 'See QR in backend terminal', '')
       }
-      setStatus(statusEl, 'Scan QR with WhatsApp', 'success')
-      // Poll for connection
-      setTimeout(loadWhatsApp, 8000)
     } else {
-      setStatus(statusEl, data.message || 'Waiting for QR...', '')
-      setTimeout(loadQR, 4000)
+      // QR not ready yet — Baileys still initialising
+      setStatus(statusEl, 'Waiting for Baileys to initialise…')
+      if (waPolling) clearTimeout(waPolling)
+      waPolling = setTimeout(loadQR, 4000)
     }
   } catch (err) {
-    setStatus(statusEl, 'Error loading QR: ' + err.message, 'error')
+    const msg = err.name === 'AbortError'
+      ? 'Server still waking up… retrying ⏳'
+      : 'Error: ' + err.message
+    setStatus(statusEl, msg, 'error')
+    if (waPolling) clearTimeout(waPolling)
+    waPolling = setTimeout(loadQR, 8000)
   }
 }
 

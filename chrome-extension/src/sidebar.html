@@ -4,153 +4,283 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BAVN</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #080b0f; --surface: #0e1318; --surface2: #141b23;
-    --border: #1e2a35; --accent: #00e5ff; --green: #7dff6b;
-    --text: #e8f0f7; --muted: #4a6070;
-  }
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-  /* ── LOGIN VIEW ── */
-  #login-view {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; height: 100vh; gap: 20px; padding: 32px;
-  }
-  .logo { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800;
-    background: linear-gradient(135deg, #00e5ff, #0088aa);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-  .tagline { font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
-  #login-status { font-size: 11px; color: var(--muted); min-height: 16px; }
+:root{
+  --teal:    #006d77;
+  --teal2:   #83c5be;
+  --mist:    #edf6f9;
+  --blush:   #ffddd2;
+  --coral:   #e29578;
+  --bg:      #edf6f9;
+  --surface: #ffffff;
+  --surface2:#f4fafc;
+  --border:  #c8e6ea;
+  --border2: #a8d5da;
+  --text:    #0d3b42;
+  --muted:   #7aacb4;
+  --muted2:  #4d8f99;
+  --success: #006d77;
+  --error:   #c0604a;
+}
 
-  /* ── APP VIEW ── */
-  #app-view { display: none; flex-direction: column; height: 100vh; }
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:'DM Mono',monospace;font-size:12px;}
 
-  /* ── HEADER ── */
-  .header { display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
-  .logo-sm { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800;
-    background: linear-gradient(135deg, #00e5ff, #0088aa);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-  .btn-sm { background: none; border: 1px solid var(--border); color: var(--muted);
-    border-radius: 4px; padding: 4px 10px; font-size: 10px; cursor: pointer;
-    font-family: 'DM Mono', monospace; letter-spacing: 1px; transition: color 0.2s; }
-  .btn-sm:hover { color: var(--text); }
+/* ── PROGRESS BAR ──────────────────────── */
+.progress-bar{
+  position:fixed;top:0;left:0;right:0;height:2px;z-index:999;
+  pointer-events:none;overflow:hidden;background:transparent;}
+.progress-bar.active{background:rgba(131,197,190,0.25);}
+.progress-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--teal),var(--teal2),var(--coral));}
+.progress-bar.active .progress-fill{
+  animation:progress-sweep 2s ease-in-out infinite;}
+@keyframes progress-sweep{
+  0%{width:0%;margin-left:0}
+  50%{width:65%;margin-left:15%}
+  100%{width:0%;margin-left:100%}}
 
-  /* ── TABS ── */
-  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
-  .tab { flex: 1; padding: 10px; text-align: center; font-size: 11px; letter-spacing: 1.5px;
-    text-transform: uppercase; cursor: pointer; color: var(--muted);
-    border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s;
-    background: none; border-top: none; border-left: none; border-right: none; }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+/* ── LOGIN VIEW ────────────────────────── */
+#login-view{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;height:100vh;gap:0;padding:40px 28px;
+  background:linear-gradient(160deg,#edf6f9,#e0f2f5);}
 
-  /* ── PANELS ── */
-  .panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
-  .panel.active { display: flex; }
-  .scroll { flex: 1; overflow-y: auto; padding: 14px; }
-  .scroll::-webkit-scrollbar { width: 4px; }
-  .scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.logo{font-family:'DM Serif Display',serif;font-size:40px;font-style:italic;
+  color:var(--teal);margin-bottom:6px;letter-spacing:1px;}
+.logo em{font-style:normal;color:var(--coral);}
+.tagline{font-size:8px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;
+  text-align:center;line-height:2.2;margin-bottom:32px;}
+.login-rule{width:48px;height:1px;background:var(--border2);margin:0 auto 28px;}
+#login-status{font-size:10px;color:var(--muted);margin-top:14px;min-height:14px;text-align:center;}
 
-  /* ── AUTOFILL ── */
-  .url-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 8px 12px; font-size: 10px; color: var(--muted); margin-bottom: 12px;
-    word-break: break-all; line-height: 1.4; }
-  .question-list { display: flex; flex-direction: column; gap: 8px; }
-  .q-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .q-card.filled { border-color: rgba(125,255,107,0.3); }
-  .q-card.from-memory { border-color: rgba(0,229,255,0.25); }
-  .q-label { padding: 10px 14px 4px; font-size: 10px; color: var(--muted); line-height: 1.4; }
-  .q-answer { padding: 0 14px 10px; font-size: 12px; color: var(--text); line-height: 1.5; }
-  .q-answer.empty { color: var(--muted); font-style: italic; }
-  .q-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px;
-    letter-spacing: 1px; text-transform: uppercase; margin: 0 14px 6px; width: fit-content; }
-  .q-badge.memory { background: rgba(0,229,255,0.1); color: var(--accent); border: 1px solid rgba(0,229,255,0.2); }
-  .q-badge.generated { background: rgba(125,255,107,0.1); color: var(--green); border: 1px solid rgba(125,255,107,0.2); }
-  .empty-state { text-align: center; color: var(--muted); font-size: 12px; padding: 40px 20px; line-height: 1.8; }
-  .empty-icon { font-size: 28px; margin-bottom: 10px; }
+/* ── APP VIEW ──────────────────────────── */
+#app-view{display:none;flex-direction:column;height:100vh;}
 
-  /* ── FOOTER ── */
-  .footer { padding: 12px 14px; border-top: 1px solid var(--border);
-    background: var(--surface); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+/* ── HEADER ────────────────────────────── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--border);
+  background:var(--teal);flex-shrink:0;position:relative;}
 
-  /* ── BUTTONS ── */
-  .btn { width: 100%; padding: 11px; border-radius: 8px; border: none;
-    font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer;
-    transition: opacity 0.2s; letter-spacing: 0.5px; }
-  .btn:hover:not(:disabled) { opacity: 0.85; }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-primary { background: var(--accent); color: #080b0f; font-weight: 500; }
-  .btn-fill    { background: var(--green);  color: #080b0f; font-weight: 500; }
-  .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-  .btn-google  { background: #fff; color: #1a1a1a; display: flex; align-items: center;
-    justify-content: center; gap: 10px; }
+.header-left{display:flex;align-items:center;gap:10px;}
+.logo-sm{font-family:'DM Serif Display',serif;font-size:19px;font-style:italic;
+  color:#fff;letter-spacing:1px;}
+.logo-sm em{font-style:normal;color:var(--blush);}
 
-  .status-bar { font-size: 10px; color: var(--muted); text-align: center; min-height: 14px; }
-  .status-bar.error   { color: #ff6b6b; }
-  .status-bar.success { color: var(--green); }
+/* question count chip */
+.q-chip{
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);
+  color:#fff;font-size:9px;letter-spacing:1px;padding:2px 7px;min-width:28px;}
+.q-chip.hidden{display:none;}
 
-  /* ── MEMORY ── */
-  .memory-list { display: flex; flex-direction: column; gap: 8px; }
-  .mem-card { background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 12px 14px; position: relative; }
-  .mem-q { font-size: 10px; color: var(--muted); line-height: 1.4; margin-bottom: 4px; }
-  .mem-a { font-size: 12px; color: var(--text); line-height: 1.5; }
-  .mem-meta { font-size: 9px; color: #2a3a45; margin-top: 6px; }
-  .mem-del { position: absolute; top: 10px; right: 10px; background: none; border: none;
-    color: var(--muted); cursor: pointer; font-size: 16px; transition: color 0.2s; }
-  .mem-del:hover { color: #ff6b6b; }
+.header-right{display:flex;align-items:center;gap:8px;}
+.live-pill{display:flex;align-items:center;gap:5px;padding:3px 8px;
+  border:1px solid rgba(255,255,255,0.25);font-size:8px;letter-spacing:1.5px;
+  text-transform:uppercase;color:rgba(255,255,255,0.85);}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--blush);
+  animation:livepulse 2s ease-in-out infinite;}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:0.35}}
+.btn-sm{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);
+  color:rgba(255,255,255,0.85);padding:3px 9px;font-size:9px;
+  font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
 
-  /* ── PROFILE ── */
-  .profile-form { display: flex; flex-direction: column; gap: 12px; }
-  .field-group { display: flex; flex-direction: column; gap: 4px; }
-  .field-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
-  .field-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 12px; color: var(--text); font-family: 'DM Mono', monospace;
-    font-size: 12px; outline: none; transition: border-color 0.2s; resize: vertical; width: 100%; }
-  .field-input:focus { border-color: var(--accent); }
+/* ── TABS ──────────────────────────────── */
+.tabs{display:flex;border-bottom:1px solid var(--border);
+  background:var(--surface);flex-shrink:0;}
+.tab{flex:1;padding:9px 2px;text-align:center;font-size:8.5px;
+  letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;
+  color:var(--muted);border:none;background:none;
+  border-bottom:2px solid transparent;transition:color 0.15s,border-color 0.15s;
+  position:relative;white-space:nowrap;}
+.tab.active{color:var(--teal);border-bottom-color:var(--teal);}
+.tab:hover:not(.active){color:var(--muted2);}
 
-  /* ── SKELETON ── */
-  .skeleton { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-    animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-  .privacy-note { font-size:10px; color:#4a6070; background:#0e1318; border:1px solid #1e2a35; border-radius:6px; padding:10px 12px; line-height:1.6; margin-bottom:4px; }
-  .field-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
-  .toggle-wrap { display:flex; align-items:center; gap:5px; cursor:pointer; }
-  .toggle-wrap input[type="checkbox"] { width:14px; height:14px; accent-color:#00e5ff; cursor:pointer; }
-  .toggle-label { font-size:9px; color:#4a6070; letter-spacing:1px; text-transform:uppercase; }
-  .toggle-wrap:has(input:checked) .toggle-label { color:#00e5ff; }
-  .learn-intro { font-size:11px; color:var(--muted); background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; line-height:1.6; margin-bottom:12px; }
-  .learn-list { display:flex; flex-direction:column; gap:10px; }
-  .learn-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
-  .learn-card.saved { border-color:rgba(125,255,107,0.4); }
-  .learn-q { padding:10px 14px 4px; font-size:10px; color:var(--muted); line-height:1.4; }
-  .learn-a { padding:0 14px 4px; }
-  .learn-a textarea { width:100%; background:transparent; border:none; color:var(--text); font-family:"DM Mono",monospace; font-size:12px; line-height:1.5; resize:vertical; outline:none; padding:4px 0 8px; min-height:60px; }
-  .learn-actions { display:flex; gap:8px; padding:0 14px 10px; }
-  .btn-save-learn { background:rgba(125,255,107,0.1); border:1px solid rgba(125,255,107,0.3); color:var(--green); border-radius:6px; padding:5px 12px; font-size:11px; font-family:"DM Mono",monospace; cursor:pointer; transition:opacity 0.2s; }
-  .btn-save-learn:hover { opacity:0.8; }
-  .btn-discard { background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:5px 12px; font-size:11px; font-family:"DM Mono",monospace; cursor:pointer; }
-  .saved-badge { font-size:9px; color:var(--green); letter-spacing:1px; padding:0 14px 8px; }
-  .manual-form { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px; display:flex; flex-direction:column; gap:8px; }
-  .manual-form textarea, .manual-form input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px 10px; color:var(--text); font-family:"DM Mono",monospace; font-size:12px; outline:none; resize:vertical; }
-  .manual-form textarea:focus, .manual-form input:focus { border-color:var(--accent); }
-  .manual-label { font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+/* coral warning dot on profile tab */
+.tab-warn-dot{
+  position:absolute;top:5px;right:4px;
+  width:5px;height:5px;border-radius:50%;background:var(--coral);
+  display:none;animation:warn-pulse 2s ease-in-out infinite;}
+@keyframes warn-pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 
-  #wa-qr-wrap canvas { max-width: 200px; width: 100%; height: auto; }
+/* ── PANELS ────────────────────────────── */
+.panel{display:none;flex-direction:column;flex:1;overflow:hidden;}
+.panel.active{display:flex;}
+.scroll{flex:1;overflow-y:auto;padding:12px;}
+.scroll::-webkit-scrollbar{width:3px;}
+.scroll::-webkit-scrollbar-thumb{background:var(--teal2);border-radius:3px;}
 
+/* ── URL BADGE ─────────────────────────── */
+.url-badge{background:var(--surface);border:1px solid var(--border);
+  border-left:3px solid var(--teal);padding:7px 10px;font-size:9px;
+  color:var(--muted2);margin-bottom:10px;word-break:break-all;line-height:1.6;}
+
+/* ── QUESTION CARDS ────────────────────── */
+.question-list{display:flex;flex-direction:column;gap:6px;}
+.q-card{background:var(--surface);border:1px solid var(--border);
+  overflow:hidden;position:relative;}
+.q-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.q-card.filled::before{background:var(--teal);}
+.q-card.from-memory::before{background:var(--coral);}
+.q-card.empty::before{background:var(--border2);}
+.q-card.generating{animation:card-pulse 1s ease-in-out infinite;}
+@keyframes card-pulse{0%,100%{opacity:0.6}50%{opacity:0.3}}
+
+.q-label{padding:8px 12px 3px;font-size:9.5px;color:var(--muted2);line-height:1.5;}
+.q-answer{padding:0 12px 8px;font-size:11px;color:var(--text);line-height:1.65;}
+.q-answer.empty{color:var(--muted);font-style:italic;}
+
+.q-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;
+  font-size:7.5px;letter-spacing:2px;text-transform:uppercase;margin:0 12px 5px;}
+.q-badge::before{content:'';width:4px;height:4px;border-radius:50%;}
+.q-badge.memory{color:var(--coral);border:1px solid rgba(226,149,120,0.35);background:rgba(226,149,120,0.1);}
+.q-badge.memory::before{background:var(--coral);}
+.q-badge.generated{color:var(--teal);border:1px solid rgba(0,109,119,0.25);background:rgba(0,109,119,0.07);}
+.q-badge.generated::before{background:var(--teal);}
+
+.empty-state{text-align:center;color:var(--muted);font-size:11px;padding:40px 20px;line-height:2;}
+.empty-icon{font-size:24px;margin-bottom:10px;opacity:0.5;}
+
+/* ── FOOTER ────────────────────────────── */
+.footer{padding:10px 12px;border-top:1px solid var(--border);
+  background:var(--surface);display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+
+/* ── BUTTONS ────────────────────────────── */
+.btn{width:100%;padding:10px;border:none;font-family:'DM Mono',monospace;
+  font-size:11px;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;
+  transition:all 0.15s;}
+.btn:hover:not(:disabled){opacity:0.88;transform:translateY(-1px);}
+.btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
+.btn-primary{background:var(--teal);color:#fff;box-shadow:0 2px 16px rgba(0,109,119,0.2);}
+.btn-fill{background:transparent;color:var(--teal);border:1.5px solid var(--teal);
+  display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-fill:hover:not(:disabled){background:rgba(0,109,119,0.05);}
+.fill-fraction{background:rgba(0,109,119,0.1);border:1px solid rgba(0,109,119,0.2);
+  color:var(--teal);font-size:9px;padding:1px 6px;letter-spacing:0.5px;}
+.btn-outline{background:transparent;color:var(--muted2);border:1px solid var(--border2);}
+.btn-outline:hover:not(:disabled){border-color:var(--teal);color:var(--teal);}
+.btn-google{background:var(--surface);color:var(--text);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;max-width:240px;padding:12px 16px;font-weight:500;
+  box-shadow:0 2px 12px rgba(0,109,119,0.1);}
+
+/* ── STATUS BAR ─────────────────────────── */
+.status-bar{font-size:9px;color:var(--muted);text-align:center;min-height:12px;letter-spacing:0.5px;}
+.status-bar.error{color:var(--error);}
+.status-bar.success{color:var(--success);}
+
+/* ── SECTION LABEL ──────────────────────── */
+.section-label{font-size:8px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── MEMORY ─────────────────────────────── */
+.memory-list{display:flex;flex-direction:column;gap:6px;}
+.mem-card{background:var(--surface);border:1px solid var(--border);
+  padding:10px 12px;position:relative;border-left:3px solid var(--teal);}
+.mem-q{font-size:9.5px;color:var(--muted2);margin-bottom:3px;line-height:1.5;}
+.mem-a{font-size:11px;color:var(--text);line-height:1.6;}
+.mem-meta{font-size:8.5px;color:var(--muted);margin-top:4px;
+  display:flex;align-items:center;gap:5px;}
+.mem-fav{width:12px;height:12px;border-radius:2px;display:inline-flex;
+  align-items:center;justify-content:center;font-size:8px;flex-shrink:0;
+  overflow:hidden;font-weight:500;}
+.mem-del{position:absolute;top:8px;right:10px;background:none;border:none;
+  color:var(--muted);cursor:pointer;font-size:14px;transition:color 0.15s;line-height:1;}
+.mem-del:hover{color:var(--error);}
+
+/* ── PROFILE ────────────────────────────── */
+.profile-form{display:flex;flex-direction:column;gap:10px;}
+.field-group{display:flex;flex-direction:column;gap:3px;}
+.field-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;}
+.field-label{font-size:8.5px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase;}
+.field-input{background:var(--surface2);border:1px solid var(--border);
+  padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;
+  font-size:11px;outline:none;transition:border-color 0.15s;resize:vertical;width:100%;}
+.field-input:focus{border-color:var(--teal);box-shadow:0 0 0 2px rgba(0,109,119,0.08);}
+.field-input::placeholder{color:var(--muted);}
+
+.privacy-note{font-size:9.5px;color:var(--muted2);background:rgba(0,109,119,0.05);
+  border:1px solid rgba(0,109,119,0.15);border-left:3px solid var(--teal);
+  padding:9px 11px;line-height:1.7;margin-bottom:10px;}
+.privacy-warn{font-size:9.5px;color:#7a2e10;background:rgba(226,149,120,0.1);
+  border:1px solid rgba(226,149,120,0.35);border-left:3px solid var(--coral);
+  padding:9px 11px;line-height:1.7;margin-bottom:10px;
+  display:none;align-items:flex-start;gap:7px;}
+.privacy-warn.show{display:flex;}
+
+.toggle-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.toggle-wrap input[type="checkbox"]{width:11px;height:11px;accent-color:var(--teal);cursor:pointer;}
+.toggle-label{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.toggle-wrap:has(input:checked) .toggle-label{color:var(--teal);}
+
+/* sensitive field on = coral label */
+.field-group.sensitive-on .field-label{color:var(--coral);}
+.field-group.sensitive-on .field-input{border-color:rgba(226,149,120,0.4);}
+
+/* ── SKELETON ───────────────────────────── */
+.skeleton{background:var(--surface);border:1px solid var(--border);
+  animation:skeleton-pulse 1.5s ease-in-out infinite;}
+@keyframes skeleton-pulse{0%,100%{opacity:0.8}50%{opacity:0.35}}
+
+/* ── LEARN ──────────────────────────────── */
+.learn-intro{font-size:10px;color:var(--muted2);background:rgba(0,109,119,0.04);
+  border:1px solid rgba(0,109,119,0.12);border-left:3px solid var(--teal);
+  padding:10px 12px;line-height:1.8;margin-bottom:10px;}
+.learn-list{display:flex;flex-direction:column;gap:8px;}
+.learn-card{background:var(--surface);border:1px solid var(--border);overflow:hidden;}
+.learn-card.saved{border-color:var(--teal2);}
+.learn-q{padding:8px 12px 3px;font-size:9.5px;color:var(--muted2);line-height:1.5;}
+.learn-a{padding:0 12px 4px;}
+.learn-a textarea{width:100%;background:transparent;border:none;color:var(--text);
+  font-family:'DM Mono',monospace;font-size:11px;line-height:1.6;
+  resize:vertical;outline:none;padding:3px 0 6px;min-height:54px;}
+.learn-actions{display:flex;gap:6px;padding:0 12px 8px;}
+.btn-save-learn{background:rgba(0,109,119,0.08);border:1px solid rgba(0,109,119,0.3);
+  color:var(--teal);padding:4px 10px;font-size:10px;
+  font-family:'DM Mono',monospace;cursor:pointer;transition:opacity 0.15s;}
+.btn-save-learn:hover{opacity:0.75;}
+.btn-discard{background:none;border:1px solid var(--border2);color:var(--muted);
+  padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;cursor:pointer;}
+.saved-badge{font-size:8.5px;color:var(--teal);letter-spacing:1px;padding:0 12px 6px;}
+.manual-form{background:var(--surface);border:1px solid var(--border);
+  padding:12px;display:flex;flex-direction:column;gap:6px;}
+.manual-form textarea,.manual-form input{width:100%;background:var(--surface2);
+  border:1px solid var(--border);padding:7px 9px;color:var(--text);
+  font-family:'DM Mono',monospace;font-size:11px;outline:none;resize:vertical;}
+.manual-form textarea:focus,.manual-form input:focus{border-color:var(--teal);}
+.manual-label{font-size:8.5px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase;}
+
+/* ── WHATSAPP ───────────────────────────── */
+.wa-command{background:var(--surface);border:1px solid var(--border);
+  border-left:3px solid var(--teal2);padding:9px 12px;
+  font-size:10px;color:var(--muted2);line-height:1.6;margin-bottom:5px;}
+.wa-connected-icon{width:46px;height:46px;border:2px solid var(--teal2);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  margin:0 auto 12px;font-size:18px;color:var(--teal);background:rgba(131,197,190,0.12);}
+#wa-qr-wrap{background:#fff;border:1px solid var(--border2);
+  padding:16px;text-align:center;margin-bottom:14px;display:none;}
+#wa-qr-wrap canvas{max-width:186px;width:100%;height:auto;}
+#wa-qr-loading{padding:4px 0 12px;}
 </style>
 </head>
 <body>
 
-<!-- LOGIN VIEW -->
+<!-- PROGRESS BAR -->
+<div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+<!-- ── LOGIN VIEW ──────────────────────── -->
 <div id="login-view">
-  <div class="logo">BAVN</div>
-  <div class="tagline">AI Form Filler</div>
-  <button class="btn btn-google" id="btn-login" style="width:100%;max-width:260px;">
-    <svg width="18" height="18" viewBox="0 0 18 18">
+  <div class="logo">B<em>A</em>VN</div>
+  <div class="tagline">Built-in Autofill<br>&amp; Verification Node</div>
+  <div class="login-rule"></div>
+  <button class="btn btn-google" id="btn-login" style="border-radius:0">
+    <svg width="16" height="16" viewBox="0 0 18 18">
       <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
       <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
       <path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/>
@@ -161,135 +291,147 @@
   <div id="login-status"></div>
 </div>
 
-<!-- APP VIEW -->
+<!-- ── APP VIEW ───────────────────────── -->
 <div id="app-view">
-  <!-- Header -->
+
   <div class="header">
-    <div class="logo-sm">BAVN</div>
-    <button class="btn-sm" id="btn-logout">Sign out</button>
+    <div class="header-left">
+      <div class="logo-sm">B<em>A</em>VN</div>
+      <div class="q-chip hidden" id="q-chip">0 Q</div>
+    </div>
+    <div class="header-right">
+      <div class="live-pill"><div class="live-dot"></div>Live</div>
+      <button class="btn-sm" id="btn-logout">Exit</button>
+    </div>
   </div>
 
-  <!-- Tabs -->
   <div class="tabs">
-    <button class="tab active" data-tab="autofill">Autofill</button>
+    <button class="tab active" data-tab="autofill">Fill</button>
     <button class="tab" data-tab="memory">Memory</button>
-    <button class="tab" data-tab="profile">Profile</button>
     <button class="tab" data-tab="learn">Learn</button>
-    <button class="tab" data-tab="whatsapp">WhatsApp</button>
+    <button class="tab" data-tab="whatsapp">WA Bot</button>
+    <button class="tab" data-tab="profile" id="tab-profile">
+      Profile
+      <div class="tab-warn-dot" id="profile-warn-dot"></div>
+    </button>
   </div>
 
-  <!-- Autofill Panel -->
+  <!-- ── AUTOFILL ── -->
   <div class="panel active" id="panel-autofill">
     <div class="scroll">
       <div class="url-badge" id="current-url">Scanning page…</div>
       <div id="question-list" class="question-list">
-        <div class="skeleton" style="height:70px"></div>
-        <div class="skeleton" style="height:70px"></div>
-        <div class="skeleton" style="height:70px"></div>
+        <div class="skeleton" style="height:64px"></div>
+        <div class="skeleton" style="height:64px;margin-top:1px"></div>
+        <div class="skeleton" style="height:64px;margin-top:1px"></div>
       </div>
     </div>
     <div class="footer">
       <div class="status-bar" id="autofill-status"></div>
-      <button class="btn btn-primary" id="btn-generate">✦ Generate Answers</button>
-      <button class="btn btn-fill"    id="btn-fill" disabled>↓ Fill All Fields</button>
-      <button class="btn btn-outline" id="btn-rescan">↺ Rescan Page</button>
+      <button class="btn btn-primary" id="btn-generate">✦  Generate Answers</button>
+      <button class="btn btn-fill" id="btn-fill" disabled>
+        ↓&nbsp; Fill
+        <span class="fill-fraction" id="fill-fraction">0 of 0</span>
+        Fields
+      </button>
+      <button class="btn btn-outline" id="btn-rescan">↺  Rescan Page</button>
     </div>
   </div>
 
-  <!-- Memory Panel -->
+  <!-- ── MEMORY ── -->
   <div class="panel" id="panel-memory">
     <div class="scroll">
       <div id="memory-list" class="memory-list">
-        <div class="skeleton" style="height:80px"></div>
-        <div class="skeleton" style="height:80px"></div>
+        <div class="skeleton" style="height:76px"></div>
+        <div class="skeleton" style="height:76px;margin-top:1px"></div>
+        <div class="skeleton" style="height:76px;margin-top:1px"></div>
       </div>
     </div>
   </div>
 
-  <!-- Learn Panel -->
+  <!-- ── LEARN ── -->
   <div class="panel" id="panel-learn">
     <div class="scroll">
-      <div class="learn-intro">BAVN can learn from answers you typed manually. Read the current page or add an answer manually.</div>
+      <div class="learn-intro">BAVN learns from answers you type. Read from the current page or add manually to build your personal knowledge base.</div>
       <div id="learn-list" class="learn-list"></div>
     </div>
     <div class="footer">
       <div class="status-bar" id="learn-status"></div>
-      <button class="btn btn-primary" id="btn-read-page">↑ Read answers from page</button>
-      <button class="btn btn-outline" id="btn-add-manual">+ Add manually</button>
+      <button class="btn btn-primary" id="btn-read-page">↑  Read Answers from Page</button>
+      <button class="btn btn-outline" id="btn-add-manual">+  Add Manually</button>
     </div>
   </div>
 
-  
-  <!-- WhatsApp Panel -->
+  <!-- ── WHATSAPP ── -->
   <div class="panel" id="panel-whatsapp">
     <div class="scroll">
-      <div id="wa-connected-view" style="display:none;">
-        <div style="text-align:center;padding:24px 0;">
-          <div style="font-size:40px;margin-bottom:12px;">✅</div>
-          <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--green);margin-bottom:8px;">WhatsApp Connected</div>
-          <div style="font-size:11px;color:var(--muted);line-height:1.6;">Send any form link or review request to BAVN on WhatsApp and it will handle everything for you.</div>
+
+      <div id="wa-connected-view" style="display:none">
+        <div style="text-align:center;padding:20px 0 18px">
+          <div class="wa-connected-icon">✓</div>
+          <div style="font-family:'DM Serif Display',serif;font-size:17px;font-style:italic;color:var(--teal);margin-bottom:6px;">Bot Active</div>
+          <div style="font-size:10px;color:var(--muted2);line-height:2;">Send any form link or review request<br>to BAVN on WhatsApp.</div>
         </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:8px;">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">Try these commands</div>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">📋 Send a form URL → fills it</div>
-            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">⭐ "Review [place], [experience], [X] stars"</div>
-            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">🧠 "memory" → see saved answers</div>
-            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--muted2);">❓ "help" → full command list</div>
-          </div>
-        </div>
-        <div style="margin-top:16px;text-align:center;">
-          <button class="btn btn-outline" id="btn-wa-disconnect">Disconnect</button>
+        <div class="section-label">Commands</div>
+        <div class="wa-command">📋 &nbsp;<b>hi form</b> → fill &amp; submit a form</div>
+        <div class="wa-command">⭐ &nbsp;<b>hi review</b> → write &amp; post a review</div>
+        <div class="wa-command">🧠 &nbsp;<b>memory</b> → your saved answers</div>
+        <div class="wa-command">🔐 &nbsp;<b>accounts</b> → manage Google accounts</div>
+        <div class="wa-command">❓ &nbsp;<b>help</b> → all commands</div>
+        <div style="margin-top:14px">
+          <button class="btn btn-outline" id="btn-wa-disconnect" style="font-size:10px;padding:9px;">Disconnect</button>
         </div>
       </div>
 
       <div id="wa-disconnected-view">
-        <div style="text-align:center;padding:16px 0 24px;">
-          <div style="font-size:40px;margin-bottom:12px;">💬</div>
-          <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--text);margin-bottom:8px;">Connect WhatsApp</div>
-          <div style="font-size:11px;color:var(--muted);line-height:1.6;">Scan the QR code with your WhatsApp to connect BAVN bot to your account.</div>
+        <div style="text-align:center;padding:18px 0 16px">
+          <div style="width:46px;height:46px;border:1.5px solid var(--teal);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;opacity:0.7;">💬</div>
+          <div style="font-family:'DM Serif Display',serif;font-size:17px;font-style:italic;color:var(--text);margin-bottom:6px;">Connect WhatsApp</div>
+          <div style="font-size:10px;color:var(--muted2);line-height:2;">Scan the QR code to activate BAVN<br>as a WhatsApp bot on your phone.</div>
         </div>
-        <div id="wa-qr-wrap" style="display:none;text-align:center;padding:16px;background:white;border-radius:12px;margin-bottom:16px;">
-          <canvas id="wa-qr-canvas"></canvas>
+        <div id="wa-qr-wrap"><canvas id="wa-qr-canvas"></canvas></div>
+        <div id="wa-qr-loading">
+          <div class="skeleton" style="height:186px;margin-bottom:8px;"></div>
+          <div style="text-align:center;font-size:9px;color:var(--muted);letter-spacing:1px;">LOADING QR CODE…</div>
         </div>
-        <div id="wa-qr-loading" style="text-align:center;padding:24px;color:var(--muted);font-size:12px;">
-          <div class="skeleton" style="height:200px;margin-bottom:8px;"></div>
-          Loading QR code...
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">How to connect</div>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <div style="font-size:11px;color:var(--muted2);">1. Open WhatsApp on your phone</div>
-            <div style="font-size:11px;color:var(--muted2);">2. Settings → Linked Devices</div>
-            <div style="font-size:11px;color:var(--muted2);">3. Link a Device → scan QR above</div>
-            <div style="font-size:11px;color:var(--muted2);">4. BAVN bot is now active ✓</div>
-          </div>
-        </div>
+        <div class="section-label" style="margin-top:16px;">Setup Steps</div>
+        <div class="wa-command">1 &nbsp;Open WhatsApp on your phone</div>
+        <div class="wa-command">2 &nbsp;Settings → Linked Devices</div>
+        <div class="wa-command">3 &nbsp;Link a Device → scan QR above</div>
+        <div class="wa-command">4 &nbsp;BAVN bot is now active ✓</div>
       </div>
+
     </div>
     <div class="footer">
       <div class="status-bar" id="wa-status"></div>
-      <button class="btn btn-primary" id="btn-wa-refresh">↻ Refresh QR</button>
+      <button class="btn btn-primary" id="btn-wa-refresh">↻  Refresh QR Code</button>
     </div>
   </div>
 
-  <!-- Profile Panel -->
+  <!-- ── PROFILE ── -->
   <div class="panel" id="panel-profile">
     <div class="scroll">
+      <div class="privacy-warn" id="privacy-warn">
+        <span style="font-size:13px;flex-shrink:0">⚠️</span>
+        <span>Sensitive field shared with AI. Make sure you trust this form before generating.</span>
+      </div>
+      <div class="privacy-note" id="privacy-note">Toggle fields to control what BAVN shares with AI. Sensitive fields are off by default.</div>
       <div class="profile-form" id="profile-form">
-        <div class="skeleton" style="height:40px"></div>
-        <div class="skeleton" style="height:40px"></div>
-        <div class="skeleton" style="height:40px"></div>
+        <div class="skeleton" style="height:36px"></div>
+        <div class="skeleton" style="height:36px"></div>
+        <div class="skeleton" style="height:36px"></div>
+        <div class="skeleton" style="height:36px"></div>
+        <div class="skeleton" style="height:64px"></div>
       </div>
     </div>
     <div class="footer">
-      <div class="status-bar" id="profile-status"></div>
-      <div id="privacy-summary" style="font-size:10px;text-align:center;min-height:14px;margin-bottom:4px;"></div>
+      <div id="privacy-summary" style="font-size:9px;text-align:center;min-height:12px;margin-bottom:2px;color:var(--muted);letter-spacing:0.5px;"></div>
       <div class="status-bar" id="profile-status"></div>
       <button class="btn btn-primary" id="btn-save-profile">Save Profile</button>
     </div>
   </div>
-</div>
+
+</div><!-- end #app-view -->
 
 <script src="sidebar.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>

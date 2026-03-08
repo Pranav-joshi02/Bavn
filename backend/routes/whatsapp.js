@@ -432,33 +432,61 @@ async function pollForAuth(token, phone, userId, sess, authPromise) {
 let sock        = null
 let qrCode      = null
 let isConnected = false
+let waReady     = false   // true once Baileys has fully initialised
+
+// Silent logger — must have all methods at top level
+const silentLogger = {
+  level: 'silent',
+  trace: ()=>{}, debug: ()=>{}, info: ()=>{},
+  warn:  ()=>{}, error: ()=>{}, fatal: ()=>{},
+  child: () => ({
+    level: 'silent',
+    trace: ()=>{}, debug: ()=>{}, info: ()=>{},
+    warn:  ()=>{}, error: ()=>{}, fatal: ()=>{}
+  })
+}
 
 async function connectWhatsApp() {
   try {
-    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason }
-      = await import('@whiskeysockets/baileys')
+    console.log('[BAVN WA] Initialising Baileys...')
+
+    // Static-style import — faster than dynamic on hot reload
+    const baileys = await import('@whiskeysockets/baileys')
+    const makeWASocket        = baileys.default
+    const useMultiFileAuthState = baileys.useMultiFileAuthState
+    const DisconnectReason    = baileys.DisconnectReason
+
     const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-session')
 
     sock = makeWASocket({
-      auth: state,
-      logger: {
-        level:  'silent',
-        trace:  ()=>{}, debug: ()=>{}, info:  ()=>{},
-        warn:   ()=>{}, error: ()=>{}, fatal: ()=>{},
-        child:  ()=>({
-          level:  'silent',
-          trace:  ()=>{}, debug: ()=>{}, info:  ()=>{},
-          warn:   ()=>{}, error: ()=>{}, fatal: ()=>{}
-        })
-      }
+      auth:             state,
+      logger:           silentLogger,
+      connectTimeoutMs: 30_000,
+      defaultQueryTimeoutMs: 20_000,
+      keepAliveIntervalMs:   15_000,
+      // Skip fetching full app state on first connect — much faster QR
+      syncFullHistory:  false,
+      markOnlineOnConnect: false,
     })
 
     sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
-      if (qr)                    { qrCode = qr; isConnected = false }
-      if (connection === 'open') { isConnected = true; qrCode = null; console.log('[BAVN WA] Connected ✓') }
+      if (qr) {
+        qrCode      = qr
+        isConnected = false
+        waReady     = true   // QR is ready — signal to /qr endpoint
+        console.log('[BAVN WA] QR ready ✓')
+      }
+      if (connection === 'open') {
+        isConnected = true
+        waReady     = true
+        qrCode      = null
+        console.log('[BAVN WA] Connected ✓')
+      }
       if (connection === 'close') {
         isConnected = false
-        const should = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+        const code   = lastDisconnect?.error?.output?.statusCode
+        const should = code !== DisconnectReason.loggedOut
+        console.log(`[BAVN WA] Disconnected. Reconnect: ${should}`)
         if (should) setTimeout(connectWhatsApp, 3000)
       }
     })
@@ -493,17 +521,20 @@ async function connectWhatsApp() {
       }
     })
 
+    console.log('[BAVN WA] Baileys setup complete, waiting for QR/connection...')
+
   } catch(err) {
     console.error('[BAVN WA] Error:', err.message)
     setTimeout(connectWhatsApp, 5000)
   }
 }
 
-connectWhatsApp()
+// Delay Baileys init by 2s so Fastify fully starts first
+setTimeout(connectWhatsApp, 2000)
 
 // ── Route handlers ────────────────────────
 export default async function whatsappRoute(app) {
-  app.get('/whatsapp/qr', async (req, reply) => {
+  app.get("/whatsapp/qr", async (req, reply) => {
     if (isConnected) return reply.send({ connected: true, qr: null })
     if (!qrCode)     return reply.send({ connected: false, qr: null, message: 'QR not ready yet' })
     return reply.send({ connected: false, qr: qrCode })
