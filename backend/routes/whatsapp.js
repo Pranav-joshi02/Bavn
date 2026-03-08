@@ -534,10 +534,105 @@ setTimeout(connectWhatsApp, 2000)
 
 // ── Route handlers ────────────────────────
 export default async function whatsappRoute(app) {
+
+  // ── GET /whatsapp/qr-page — standalone browser QR page ──
+  app.get('/whatsapp/qr-page', async (req, reply) => {
+    return reply.type('text/html').send(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BAVN — WhatsApp QR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:#edf6f9;font-family:monospace;padding:24px;}
+.card{background:#fff;border:1px solid #c8e6ea;max-width:320px;width:100%;
+  padding:32px 28px;text-align:center;}
+.brand{font-size:10px;color:#83c5be;letter-spacing:3px;text-transform:uppercase;margin-bottom:24px;}
+.title{font-size:16px;color:#0d3b42;margin-bottom:6px;font-weight:500;}
+.sub{font-size:11px;color:#4d8f99;line-height:1.8;margin-bottom:20px;}
+#qr-box{min-height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
+#qr-box canvas{border:1px solid #c8e6ea;}
+.status{font-size:10px;color:#7aacb4;letter-spacing:1px;min-height:16px;}
+.status.ok{color:#006d77;font-weight:500;}
+.status.err{color:#c0604a;}
+.spinner{width:32px;height:32px;border:2px solid #c8e6ea;
+  border-top-color:#006d77;border-radius:50%;
+  animation:spin 0.8s linear infinite;margin:auto;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.steps{font-size:10px;color:#4d8f99;line-height:2.2;text-align:left;
+  margin-top:18px;border-top:1px solid #c8e6ea;padding-top:14px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">BAVN.io</div>
+  <div class="title">WhatsApp Setup</div>
+  <div class="sub">Scan with WhatsApp to activate<br>the BAVN bot on your phone</div>
+  <div id="qr-box"><div class="spinner"></div></div>
+  <div class="status" id="status">Connecting…</div>
+  <div class="steps">
+    1 · Open WhatsApp on your phone<br>
+    2 · Settings → Linked Devices<br>
+    3 · Link a Device → scan QR above<br>
+    4 · BAVN bot is now active ✓
+  </div>
+</div>
+<script>
+const BASE = window.location.origin
+let timer = null
+
+async function poll() {
+  const box    = document.getElementById('qr-box')
+  const status = document.getElementById('status')
+  try {
+    const res  = await fetch(BASE + '/api/whatsapp/qr')
+    const data = await res.json()
+
+    if (data.connected) {
+      box.innerHTML = '<div style="font-size:48px;padding:16px">✅</div>'
+      status.textContent = 'Connected! You can close this tab.'
+      status.className   = 'status ok'
+      return
+    }
+
+    if (data.qr) {
+      box.innerHTML = '<div id="qr-render"></div>'
+      new QRCode(document.getElementById('qr-render'), {
+        text: data.qr, width: 200, height: 200,
+        colorDark: '#006d77', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      })
+      status.textContent = 'Scan with WhatsApp now ↑'
+      status.className   = 'status ok'
+      timer = setTimeout(poll, 5000)
+      return
+    }
+
+    status.textContent = data.message || 'Initialising… please wait'
+    timer = setTimeout(poll, 3000)
+
+  } catch(e) {
+    status.textContent = 'Retrying…'
+    status.className   = 'status err'
+    timer = setTimeout(poll, 4000)
+  }
+}
+
+poll()
+</script>
+</body>
+</html>`)
+  })
+
+  // ── GET /whatsapp/qr ──────────────────────
   app.get("/whatsapp/qr", async (req, reply) => {
-    if (isConnected) return reply.send({ connected: true, qr: null })
-    if (!qrCode)     return reply.send({ connected: false, qr: null, message: 'QR not ready yet' })
-    return reply.send({ connected: false, qr: qrCode })
+    if (isConnected) return reply.send({ connected: true,  qr: null })
+    if (qrCode)      return reply.send({ connected: false, qr: qrCode, ready: true })
+    if (!waReady)    return reply.send({ connected: false, qr: null, ready: false, message: 'Baileys initialising — please wait…' })
+    return reply.send({ connected: false, qr: null, ready: true, message: 'Generating QR…' })
   })
 
   app.get('/whatsapp/status', async (req, reply) => {
