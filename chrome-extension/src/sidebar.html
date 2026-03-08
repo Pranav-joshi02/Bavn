@@ -387,18 +387,34 @@ html,body{height:100%;background:var(--bg);color:var(--text);
         <div style="text-align:center;padding:18px 0 16px">
           <div style="width:46px;height:46px;border:1.5px solid var(--teal);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;opacity:0.7;">💬</div>
           <div style="font-family:'DM Serif Display',serif;font-size:17px;font-style:italic;color:var(--text);margin-bottom:6px;">Connect WhatsApp</div>
-          <div style="font-size:10px;color:var(--muted2);line-height:2;">Scan the QR code to activate BAVN<br>as a WhatsApp bot on your phone.</div>
+          <div style="font-size:10px;color:var(--muted2);line-height:2;">Open the QR page in your browser<br>and scan with WhatsApp.</div>
         </div>
-        <div id="wa-qr-wrap"><canvas id="wa-qr-canvas"></canvas></div>
-        <div id="wa-qr-loading">
-          <div class="skeleton" style="height:186px;margin-bottom:8px;"></div>
-          <div style="text-align:center;font-size:9px;color:var(--muted);letter-spacing:1px;">LOADING QR CODE…</div>
+
+        <!-- QR inline (tries to load in sidebar) -->
+        <div id="wa-qr-wrap" style="display:none;background:#fff;border:1px solid var(--border2);padding:16px;text-align:center;margin-bottom:12px;">
+          <canvas id="wa-qr-canvas"></canvas>
         </div>
-        <div class="section-label" style="margin-top:16px;">Setup Steps</div>
-        <div class="wa-command">1 &nbsp;Open WhatsApp on your phone</div>
-        <div class="wa-command">2 &nbsp;Settings → Linked Devices</div>
-        <div class="wa-command">3 &nbsp;Link a Device → scan QR above</div>
-        <div class="wa-command">4 &nbsp;BAVN bot is now active ✓</div>
+        <div id="wa-qr-loading" style="text-align:center;padding:12px 0 16px;">
+          <div class="skeleton" style="height:160px;margin-bottom:8px;"></div>
+          <div style="font-size:9px;color:var(--muted);letter-spacing:1px;" id="wa-qr-loading-text">CONNECTING…</div>
+        </div>
+
+        <!-- Fallback: open QR in browser tab -->
+        <div id="wa-qr-fallback" style="display:none;margin-bottom:12px;">
+          <div style="font-size:10px;color:var(--muted2);text-align:center;line-height:1.8;margin-bottom:10px;">
+            QR ready — open in browser to scan:
+          </div>
+          <a id="wa-qr-link" href="#" target="_blank" class="btn btn-primary"
+            style="display:block;text-align:center;text-decoration:none;padding:10px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;background:var(--teal);color:#fff;">
+            ↗ &nbsp;Open QR Page
+          </a>
+        </div>
+
+        <div class="section-label">Setup Steps</div>
+        <div class="wa-command">1 &nbsp;Click "Open QR Page" above</div>
+        <div class="wa-command">2 &nbsp;Open WhatsApp → Settings</div>
+        <div class="wa-command">3 &nbsp;Linked Devices → Link a Device</div>
+        <div class="wa-command">4 &nbsp;Scan the QR → bot is active ✓</div>
       </div>
 
     </div>
@@ -434,6 +450,5 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 </div><!-- end #app-view -->
 
 <script src="sidebar.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </body>
 </html>
