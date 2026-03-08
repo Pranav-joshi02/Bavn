@@ -2,7 +2,7 @@
 // BAVN.io — sidebar.js
 // ============================================
 
-const API_BASE = 'https://bavn-production-ac52.up.railway.app'   // ← swap to Railway URL after deploy
+const API_BASE = 'https://bavn-backend.onrender.com'   // ← swap to Railway URL after deploy
 
 // ── Sensitive fields — off by default ─────
 const SENSITIVE_FIELDS = ['email', 'phone', 'linkedin']
