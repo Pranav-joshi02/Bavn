@@ -11,10 +11,16 @@ const supabase = createClient(
 )
 
 // Routes that skip auth
-const PUBLIC_ROUTES = ['/health']
+const PUBLIC_ROUTES = [
+  '/health',
+  '/api/whatsapp/qr',
+  '/api/whatsapp/status',
+  '/link',
+  '/link/callback',
+]
 
 export async function authMiddleware(req, reply) {
-  if (PUBLIC_ROUTES.includes(req.url)) return
+  if (PUBLIC_ROUTES.some(r => req.url === r || req.url.startsWith(r + '?'))) return
 
   const authHeader = req.headers['authorization']
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
