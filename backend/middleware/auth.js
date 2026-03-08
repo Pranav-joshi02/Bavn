@@ -16,6 +16,7 @@ const PUBLIC_ROUTES = [
   '/api/whatsapp/qr',
   '/api/whatsapp/qr-page',
   '/api/whatsapp/status',
+  '/api/whatsapp/reset',
   '/link',
   '/link/callback',
 ]

@@ -450,44 +450,68 @@ async function connectWhatsApp() {
   try {
     console.log('[BAVN WA] Initialising Baileys...')
 
-    // Static-style import — faster than dynamic on hot reload
     const baileys = await import('@whiskeysockets/baileys')
-    const makeWASocket        = baileys.default
+    const makeWASocket          = baileys.default
     const useMultiFileAuthState = baileys.useMultiFileAuthState
-    const DisconnectReason    = baileys.DisconnectReason
+    const DisconnectReason      = baileys.DisconnectReason
 
     const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-session')
 
     sock = makeWASocket({
-      auth:             state,
-      logger:           silentLogger,
-      connectTimeoutMs: 30_000,
-      defaultQueryTimeoutMs: 20_000,
-      keepAliveIntervalMs:   15_000,
-      // Skip fetching full app state on first connect — much faster QR
-      syncFullHistory:  false,
-      markOnlineOnConnect: false,
+      auth:                  state,
+      logger:                silentLogger,
+      connectTimeoutMs:      60_000,
+      defaultQueryTimeoutMs: 30_000,
+      keepAliveIntervalMs:   25_000,
+      syncFullHistory:       false,
+      markOnlineOnConnect:   false,
+      retryRequestDelayMs:   2000,
     })
 
-    sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+    sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
       if (qr) {
         qrCode      = qr
         isConnected = false
-        waReady     = true   // QR is ready — signal to /qr endpoint
+        waReady     = true
         console.log('[BAVN WA] QR ready ✓')
       }
+
       if (connection === 'open') {
         isConnected = true
         waReady     = true
         qrCode      = null
         console.log('[BAVN WA] Connected ✓')
       }
+
       if (connection === 'close') {
         isConnected = false
-        const code   = lastDisconnect?.error?.output?.statusCode
-        const should = code !== DisconnectReason.loggedOut
-        console.log(`[BAVN WA] Disconnected. Reconnect: ${should}`)
-        if (should) setTimeout(connectWhatsApp, 3000)
+        const statusCode = lastDisconnect?.error?.output?.statusCode
+        const reason     = lastDisconnect?.error?.message || 'unknown'
+        console.log(`[BAVN WA] Disconnected. Code: ${statusCode} Reason: ${reason}`)
+
+        if (statusCode === DisconnectReason.loggedOut) {
+          // Logged out — clear session and restart fresh to get new QR
+          console.log('[BAVN WA] Logged out — clearing session...')
+          await clearSession()
+          waReady = false
+          qrCode  = null
+          setTimeout(connectWhatsApp, 2000)
+
+        } else if (statusCode === 515 || statusCode === 408 || statusCode === 503) {
+          // Restart required or timeout — reconnect after delay
+          console.log('[BAVN WA] Restart needed — reconnecting in 5s...')
+          setTimeout(connectWhatsApp, 5000)
+
+        } else if (statusCode === 440) {
+          // Another device connected — clear and restart
+          console.log('[BAVN WA] Replaced by another device — reconnecting...')
+          await clearSession()
+          setTimeout(connectWhatsApp, 3000)
+
+        } else {
+          // Generic disconnect — reconnect
+          setTimeout(connectWhatsApp, 3000)
+        }
       }
     })
 
@@ -524,8 +548,23 @@ async function connectWhatsApp() {
     console.log('[BAVN WA] Baileys setup complete, waiting for QR/connection...')
 
   } catch(err) {
-    console.error('[BAVN WA] Error:', err.message)
+    console.error('[BAVN WA] Fatal error:', err.message)
     setTimeout(connectWhatsApp, 5000)
+  }
+}
+
+// Clear corrupted/expired session files
+async function clearSession() {
+  try {
+    const fs   = await import('fs')
+    const path = await import('path')
+    const dir  = './whatsapp-session'
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true })
+      console.log('[BAVN WA] Session cleared ✓')
+    }
+  } catch(e) {
+    console.error('[BAVN WA] Could not clear session:', e.message)
   }
 }
 
@@ -639,7 +678,18 @@ poll()
     return reply.send({ connected: isConnected, hasQR: !!qrCode })
   })
 
-  app.post('/whatsapp/send', async (req, reply) => {
+  app.post('/whatsapp/reset', async (req, reply) => {
+    console.log('[BAVN WA] Manual reset requested')
+    isConnected = false
+    waReady     = false
+    qrCode      = null
+    if (sock) { try { sock.end() } catch(e) {} sock = null }
+    await clearSession()
+    setTimeout(connectWhatsApp, 1000)
+    return reply.send({ success: true, message: 'Session reset — new QR generating in ~5 seconds' })
+  })
+
+
     const { phone, message } = req.body
     if (!isConnected) return reply.code(503).send({ error: 'WhatsApp not connected' })
     try {
@@ -648,5 +698,4 @@ poll()
     } catch(err) {
       return reply.code(500).send({ error: err.message })
     }
-  })
-}
+  }
