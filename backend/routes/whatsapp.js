@@ -440,11 +440,11 @@ async function connectWhatsApp() {
     console.log('[BAVN WA] Initialising Baileys...')
 
     const baileys = await import('@whiskeysockets/baileys')
-    const makeWASocket          = baileys.default
+    const makeWASocket          = baileys.makeWASocket || baileys.default
     const useMultiFileAuthState = baileys.useMultiFileAuthState
     const DisconnectReason      = baileys.DisconnectReason
 
-    console.log('[BAVN WA] Baileys imported ✓')
+    console.log('[BAVN WA] Baileys imported ✓ export keys:', Object.keys(baileys).join(', '))
 
     const { state, saveCreds } = await useMultiFileAuthState('./whatsapp-session')
 
