@@ -760,3 +760,79 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loggedIn) startFillJobPoller()
   }).catch(() => {})
 })
+
+// ── TELEGRAM SCRAPE JOB POLLER ────────────
+// Polls for scrape jobs from Telegram bot
+// When found: opens URL in tab, extracts questions, sends back
+async function checkScrapeJob() {
+  try {
+    const data = await api('GET', '/api/telegram/scrape-jobs')
+    const job  = data?.job
+    if (!job) return
+
+    console.log('[BAVN] Scrape job received:', job.id, job.form_url)
+
+    // Open the form URL in a new tab
+    const tab = await chrome.tabs.create({ url: job.form_url, active: true })
+
+    // Wait for page to load
+    await new Promise(resolve => {
+      chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+        if (tabId === tab.id && info.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(listener)
+          resolve()
+        }
+      })
+      // Fallback timeout
+      setTimeout(resolve, 8000)
+    })
+
+    // Extra wait for JS to render
+    await new Promise(r => setTimeout(r, 2000))
+
+    // Extract questions using content script
+    let questions = []
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'GET_QUESTIONS' })
+      questions = response?.questions || []
+    } catch(e) {
+      console.log('[BAVN] Could not extract questions:', e.message)
+    }
+
+    if (questions.length) {
+      // Send questions back to backend
+      await api('POST', `/api/telegram/scrape-jobs/${job.id}/done`, { questions })
+      console.log(`[BAVN] Sent ${questions.length} questions to bot`)
+
+      // Show notification in extension
+      setStatus(document.getElementById('autofill-status'),
+        `✓ Sent ${questions.length} questions to Telegram bot`, 'success')
+
+      // Switch to Fill tab so user can see
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+      document.querySelector('[data-tab="autofill"]').classList.add('active')
+      document.getElementById('panel-autofill').classList.add('active')
+
+    } else {
+      // No questions found — mark as failed so bot asks manually
+      await api('POST', `/api/telegram/scrape-jobs/${job.id}/done`, { questions: [] })
+    }
+
+  } catch(e) {
+    // Silent fail
+  }
+}
+
+// Add scrape job polling to the existing poller
+const _originalFillPoll = checkFillJob
+async function checkAllJobs() {
+  await _originalFillPoll()
+  await checkScrapeJob()
+}
+
+// Override the interval to check both
+if (fillJobPollTimer) {
+  clearInterval(fillJobPollTimer)
+  fillJobPollTimer = setInterval(checkAllJobs, 5000)
+}
