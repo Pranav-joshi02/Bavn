@@ -406,20 +406,6 @@ async function handleMessage(chatId, userId, text) {
     )
     return
   }
-    const hasS      = await hasSession(userId)
-    const submitBtn = hasS ? '🚀 Auto-Submit' : '✅ Save to Memory'
-
-    await sendButtons(chatId,
-      `✅ *${answers.length} answers ready* 👇${acctLine}\n\n` +
-      `${formatAnswers(answers)}\n\n——\n` +
-      (hasS
-        ? `📱 Open form in Chrome OR tap *Auto-Submit* to let me fill & submit it`
-        : `📱 *Open the form in Chrome* — BAVN extension will auto-fill it`),
-      [[submitBtn, '👁 Preview All'], ['✏️ Change Answer', '❌ Cancel']]
-    )
-    return
-  }
-
   // ═══ FORM: PREVIEW ═══════════════════════
   if (sess.state === 'form_preview') {
 
@@ -634,8 +620,9 @@ async function handleMessage(chatId, userId, text) {
     return
   }
 
-  // Fallback
-
+  // ── Fallback — show main menu ─────────────
+  await showMainMenu(chatId)
+}
 
 // ── Account picker ────────────────────────
 async function pickAccount(chatId, userId, sess) {
