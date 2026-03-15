@@ -339,54 +339,39 @@ async function handleMessage(chatId, userId, text) {
       return
     }
     sess.formUrl = msg
-    sess.state   = 'awaiting_scrape'
-
-    // Create a scrape job — extension will open URL and extract questions
-    const { data: job } = await supabase
-      .from('scrape_jobs')
-      .insert({ user_id: userId, form_url: sess.formUrl, status: 'pending' })
-      .select().single()
-
-    sess.scrapeJobId = job?.id
-
-    await sendMessage(chatId,
-      `📋 Form URL received!\n\n` +
-      `*Open the BAVN extension* in Chrome — it will automatically open the form and extract questions.\n\n` +
-      `_Make sure you have the form open in Chrome, then come back here._`
-    )
-    return
-  }
-
-  // ═══ FORM: WAITING FOR SCRAPE ═══════════════
-  if (sess.state === 'awaiting_scrape') {
-    // Check if extension has completed the scrape
-    const { data: job } = await supabase
-      .from('scrape_jobs')
-      .select('*')
-      .eq('id', sess.scrapeJobId)
-      .single()
-
-    if (!job || job.status !== 'done' || !job.questions?.length) {
-      await sendMessage(chatId,
-        `⏳ Still waiting for the extension to extract questions.\n\n` +
-        `Make sure:\n` +
-        `1. Chrome is open with BAVN extension\n` +
-        `2. The form URL is open in a tab\n\n` +
-        `_Or type the questions manually, one per line:_`
-      )
-      sess.state = 'awaiting_manual_questions'
-      return
-    }
-
-    // Questions extracted — generate answers
-    const questions = job.questions
-    sess.questions  = questions
-    sess.state      = 'form_preview'
-
-    await sendMessage(chatId, `✅ Found *${questions.length} questions* — generating answers...`)
+    sess.state   = 'generating_form'
+    await sendMessage(chatId, `🔍 Opening form and extracting questions...`)
 
     const { data: profile } = await supabase
       .from('profiles').select('*').eq('user_id', userId).single()
+
+    // Scrape with Browserless — 30s timeout
+    let questions = []
+    try {
+      const result = await Promise.race([
+        scrapeFormQuestions(sess.formUrl, userId),
+        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 30000))
+      ])
+      questions = result?.questions || []
+      console.log(`[BAVN TG] Got ${questions.length} questions`)
+    } catch(e) {
+      console.error('[BAVN TG] Scrape error:', e.message)
+    }
+
+    if (!questions.length) {
+      sess.state = 'awaiting_manual_questions'
+      await sendMessage(chatId,
+        `⚠️ Couldn't extract questions automatically.\n\n` +
+        `Type the questions below, *one per line*:\n\n` +
+        `_Why do you want to apply?_\n` +
+        `_What is your expected stipend?_`
+      )
+      return
+    }
+
+    sess.questions = questions
+    sess.state     = 'form_preview'
+    await sendMessage(chatId, `✅ Found *${questions.length} questions* — generating answers...`)
 
     let answers
     try {
@@ -418,6 +403,16 @@ async function handleMessage(chatId, userId, text) {
       `${formatAnswers(answers)}\n\n——\n` +
       `📱 Open form in Chrome — extension auto-fills it`,
       [[submitBtn, '👁 Preview All'], ['✏️ Change Answer', '❌ Cancel']]
+    )
+    return
+  }
+
+  // ═══ FORM: WAITING FOR SCRAPE (unused - kept for safety) ══
+  if (sess.state === 'awaiting_scrape') {
+    sess.state = 'awaiting_manual_questions'
+    await sendMessage(chatId,
+      `Type the questions manually, one per line:\n\n` +
+      `_Why do you want to apply?_\n_What is your expected stipend?_`
     )
     return
   }
