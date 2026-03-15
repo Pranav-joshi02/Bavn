@@ -289,7 +289,7 @@ function setStatus(el, msg, type = '') {
 async function init() {
   try {
     const { loggedIn } = await chrome.runtime.sendMessage({ type: 'GET_AUTH' })
-    if (loggedIn) { showApp(); scanPage() }
+    if (loggedIn) { showApp(); showTelegramBanner(); scanPage() }
     else showLogin()
   } catch (e) {
     console.error('[BAVN]', e)
@@ -301,9 +301,22 @@ function showLogin() {
   document.getElementById('login-view').style.display = 'flex'
   document.getElementById('app-view').style.display   = 'none'
 }
-function showApp() {
+
+const TG_BOT_USERNAME = 'bavn_bot' // ← update this to your bot username after setup
+
+function showApp(firstTime = false) {
   document.getElementById('login-view').style.display = 'none'
   document.getElementById('app-view').style.display   = 'flex'
+  if (firstTime) showTelegramBanner()
+}
+
+function showTelegramBanner() {
+  // Don't show banner if already dismissed
+  chrome.storage.local.get(['bavn_tg_banner_dismissed'], ({ bavn_tg_banner_dismissed }) => {
+    if (bavn_tg_banner_dismissed) return
+    const banner = document.getElementById('tg-banner')
+    if (banner) banner.style.display = 'flex'
+  })
 }
 
 // ── LOGIN ─────────────────────────────────
@@ -316,7 +329,7 @@ document.getElementById('btn-login').addEventListener('click', async () => {
   try {
     const result = await chrome.runtime.sendMessage({ type: 'LOGIN' })
     if (result.error) throw new Error(result.error)
-    showApp(); scanPage()
+    showApp(true); scanPage() // firstTime = true shows Telegram banner
   } catch (err) {
     status.textContent = err.message ?? 'Login failed'
     status.style.color = '#ff6b6b'
@@ -329,6 +342,16 @@ document.getElementById('btn-login').addEventListener('click', async () => {
 document.getElementById('btn-logout').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'LOGOUT' })
   showLogin()
+})
+
+// ── TELEGRAM BANNER ───────────────────────
+document.getElementById('tg-banner-btn')?.addEventListener('click', (e) => {
+  e.preventDefault()
+  chrome.tabs.create({ url: `https://t.me/${TG_BOT_USERNAME}` })
+})
+document.getElementById('tg-banner-dismiss')?.addEventListener('click', () => {
+  document.getElementById('tg-banner').style.display = 'none'
+  chrome.storage.local.set({ bavn_tg_banner_dismissed: true })
 })
 
 // ── TABS ──────────────────────────────────
@@ -495,8 +518,33 @@ document.getElementById('btn-generate').addEventListener('click', async () => {
 
 document.getElementById('btn-fill').addEventListener('click', async () => {
   if (!currentAnswers.length) return
-  await chrome.runtime.sendMessage({ type: 'FILL_FIELDS', answers: currentAnswers })
-  setStatus(document.getElementById('autofill-status'), 'Fields filled ✓', 'success')
+  const btn     = document.getElementById('btn-fill')
+  const statusEl= document.getElementById('autofill-status')
+  const bar     = document.getElementById('progress-bar')
+  btn.disabled  = true
+  bar.classList.add('active')
+  setStatus(statusEl, '↓ Filling form…')
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+
+    // Use FILL_AND_ADVANCE — handles multi-page forms automatically
+    const result = await chrome.tabs.sendMessage(tab.id, {
+      type:    'FILL_AND_ADVANCE',
+      answers: currentAnswers.filter(Boolean)
+    })
+
+    if (result?.lastPage && result?.submitBtn) {
+      setStatus(statusEl, '✓ All pages filled — review and submit ✓', 'success')
+    } else {
+      setStatus(statusEl, '✓ Form filled ✓', 'success')
+    }
+  } catch (err) {
+    setStatus(document.getElementById('autofill-status'), err.message, 'error')
+  } finally {
+    btn.disabled = false
+    bar.classList.remove('active')
+  }
 })
 
 document.getElementById('btn-rescan').addEventListener('click', scanPage)
@@ -580,6 +628,7 @@ const PROFILE_FIELDS = [
   { key: 'name',            label: 'Full Name',       type: 'text',     sensitive: false },
   { key: 'email',           label: 'Email',           type: 'email',    sensitive: true  },
   { key: 'phone',           label: 'Phone',           type: 'tel',      sensitive: true  },
+  { key: 'telegram_id',     label: 'Telegram ID',     type: 'text',     sensitive: false },
   { key: 'college',         label: 'College',         type: 'text',     sensitive: false },
   { key: 'degree',          label: 'Degree',          type: 'text',     sensitive: false },
   { key: 'graduation_year', label: 'Graduation Year', type: 'number',   sensitive: false },
