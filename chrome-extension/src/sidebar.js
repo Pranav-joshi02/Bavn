@@ -7,241 +7,6 @@ const API_BASE = 'https://bavn-backend.onrender.com'
 // ── Self-contained QR Code renderer ──────
 // No external library needed — pure canvas
 // Minimal QR encoder for alphanumeric + byte mode
-;(function(global) {
-  // QR code generation using qr-creator algorithm (MIT)
-  // Supports all string types needed for Baileys QR data
-  function generateQR(text, canvas, size, darkColor, lightColor) {
-    try {
-      // Use the built-in approach via an offscreen data URL approach
-      // We'll use a simpler method: encode as a data URL using a minimal QR lib
-      drawQRToCanvas(text, canvas, size, darkColor || '#006d77', lightColor || '#ffffff')
-    } catch(e) {
-      console.error('QR render failed:', e)
-    }
-  }
-
-  // Minimal QR matrix generator
-  function drawQRToCanvas(text, canvas, moduleSize, dark, light) {
-    const qr = createQRMatrix(text)
-    if (!qr) return
-    const n = qr.length
-    const px = moduleSize || 200
-    canvas.width  = px
-    canvas.height = px
-    const ctx = canvas.getContext('2d')
-    const cell = px / n
-    ctx.fillStyle = light
-    ctx.fillRect(0, 0, px, px)
-    ctx.fillStyle = dark
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        if (qr[r][c]) {
-          ctx.fillRect(Math.floor(c * cell), Math.floor(r * cell),
-            Math.ceil(cell), Math.ceil(cell))
-        }
-      }
-    }
-  }
-
-  // ── QR Matrix core (Reed-Solomon + masking) ──
-  function createQRMatrix(text) {
-    try {
-      // Encode as bytes
-      const data = []
-      for (let i = 0; i < text.length; i++) data.push(text.charCodeAt(i) & 0xff)
-
-      // Use QR version auto-select (versions 1-10)
-      const version = selectVersion(data.length)
-      if (!version) return null
-
-      const size   = version * 4 + 17
-      const matrix = Array.from({length: size}, () => new Array(size).fill(null))
-
-      placePatterns(matrix, size, version)
-      const codewords = buildCodewords(data, version)
-      placeData(matrix, size, codewords)
-      const mask = applyBestMask(matrix, size)
-      placeFormatInfo(matrix, size, 0, mask) // ECC level M
-
-      // Convert null → 0 (unset = light)
-      return matrix.map(row => row.map(v => v === true ? 1 : 0))
-    } catch(e) {
-      console.error('QR matrix error:', e)
-      return null
-    }
-  }
-
-  const VERSIONS = [0,19,34,55,80,108,136,156,194,232,274]
-  function selectVersion(len) {
-    for (let v = 1; v <= 10; v++) if (len + 3 <= VERSIONS[v]) return v
-    return 10
-  }
-
-  function placePatterns(m, s, ver) {
-    // Finder patterns
-    [[0,0],[0,s-7],[s-7,0]].forEach(([r,c]) => {
-      for (let dr = 0; dr < 7; dr++)
-        for (let dc = 0; dc < 7; dc++)
-          m[r+dr][c+dc] = (dr===0||dr===6||dc===0||dc===6||
-            (dr>=2&&dr<=4&&dc>=2&&dc<=4))
-    })
-    // Separators (light border around finders)
-    for (let i = 0; i < 8; i++) {
-      safe(m,s,7,i,false); safe(m,s,i,7,false)
-      safe(m,s,s-8,i,false); safe(m,s,i,s-8,false)
-      safe(m,s,7,s-1-i,false); safe(m,s,s-1-i,7,false)
-    }
-    // Timing patterns
-    for (let i = 8; i < s-8; i++) {
-      if (m[6][i]===null) m[6][i] = (i%2===0)
-      if (m[i][6]===null) m[i][6] = (i%2===0)
-    }
-    // Dark module
-    m[s-8][8] = true
-    // Alignment patterns for version >= 2
-    if (ver >= 2) {
-      const pos = getAlignPos(ver)
-      for (const r of pos) for (const c of pos) {
-        if (m[r][c]!==null) continue
-        for (let dr=-2;dr<=2;dr++) for(let dc=-2;dc<=2;dc++)
-          m[r+dr][c+dc] = (dr===-2||dr===2||dc===-2||dc===2||
-            (dr===0&&dc===0))
-      }
-    }
-  }
-
-  function safe(m,s,r,c,v) { if(r>=0&&r<s&&c>=0&&c<s&&m[r][c]===null) m[r][c]=v }
-
-  const ALIGN = [[],[],[6,18],[6,22],[6,26],[6,30],[6,34],
-    [6,22,38],[6,24,42],[6,26,46],[6,28,50]]
-  function getAlignPos(v) { return ALIGN[v] || [] }
-
-  function buildCodewords(data, ver) {
-    // Mode byte: 0100 = byte mode
-    // Character count: 8 bits for versions 1-9
-    const bits = []
-    bits.push(0,1,0,0) // byte mode
-    const len = data.length
-    for (let i=7;i>=0;i--) bits.push((len>>i)&1)
-    for (const b of data)
-      for (let i=7;i>=0;i--) bits.push((b>>i)&1)
-    // Terminator
-    for (let i=0;i<4&&bits.length<totalDataBits(ver);i++) bits.push(0)
-    // Pad to byte
-    while (bits.length%8) bits.push(0)
-    // Pad codewords
-    const PAD = [0xEC,0x11]
-    let pi = 0
-    while (bits.length < totalDataBits(ver)) {
-      const p = PAD[pi%2]; pi++
-      for (let i=7;i>=0;i--) bits.push((p>>i)&1)
-    }
-    // Convert to bytes
-    const cw = []
-    for (let i=0;i<bits.length;i+=8) {
-      let b=0
-      for (let j=0;j<8;j++) b=(b<<1)|(bits[i+j]||0)
-      cw.push(b)
-    }
-    return cw
-  }
-
-  const DATA_CW = [0,19,34,55,80,108,136,156,194,232,274]
-  function totalDataBits(v) { return DATA_CW[v]*8 }
-
-  function placeData(m, s, cw) {
-    let idx=0, bit=7
-    let up = true
-    for (let col = s-1; col >= 1; col -= 2) {
-      if (col === 6) col--
-      for (let i=0;i<s;i++) {
-        const row = up ? s-1-i : i
-        for (let c2=0;c2<2;c2++) {
-          const c = col - c2
-          if (m[row][c] !== null) continue
-          const b = idx < cw.length ? (cw[idx]>>bit)&1 : 0
-          m[row][c] = !!b
-          bit--
-          if (bit < 0) { bit=7; idx++ }
-        }
-      }
-      up = !up
-    }
-  }
-
-  const MASK_FN = [
-    (r,c)=>(r+c)%2===0,
-    (r,c)=>r%2===0,
-    (r,c)=>c%3===0,
-    (r,c)=>(r+c)%3===0,
-    (r,c)=>(Math.floor(r/2)+Math.floor(c/3))%2===0,
-    (r,c)=>(r*c)%2+(r*c)%3===0,
-    (r,c)=>((r*c)%2+(r*c)%3)%2===0,
-    (r,c)=>((r+c)%2+(r*c)%3)%2===0,
-  ]
-
-  function applyBestMask(m, s) {
-    let best=-1, bestScore=Infinity
-    for (let mask=0;mask<8;mask++) {
-      const tmp = m.map(r=>[...r])
-      applyMask(tmp, s, mask)
-      placeFormatInfo(tmp, s, 0, mask)
-      const score = penalty(tmp, s)
-      if (score < bestScore) { bestScore=score; best=mask }
-    }
-    applyMask(m, s, best)
-    return best
-  }
-
-  function applyMask(m, s, mask) {
-    const fn = MASK_FN[mask]
-    for (let r=0;r<s;r++) for(let c=0;c<s;c++)
-      if (m[r][c]!==null && isData(m,s,r,c)) m[r][c] ^= fn(r,c)?1:0
-  }
-
-  function isData(m,s,r,c) {
-    // Rough check — format/finder/timing areas are non-null from patterns
-    return true // simplified; masked cells already set to non-null
-  }
-
-  function penalty(m, s) {
-    let p=0
-    // Rule 1: 5+ same color in row/col
-    for (let r=0;r<s;r++) {
-      let run=1
-      for(let c=1;c<s;c++){
-        if(m[r][c]===m[r][c-1]) run++
-        else { if(run>=5) p+=run-2; run=1 }
-      }
-      if(run>=5) p+=run-2
-    }
-    return p
-  }
-
-  // FORMAT INFO (ECC level M = 00, with mask)
-  const FORMAT_MASK = 0b101010000010010
-  const FORMAT_POLYS = [
-    0b101010000010010, 0b101000100100101, 0b101111001111100, 0b101101101001011,
-    0b100010111111001, 0b100000011001110, 0b100111110010111, 0b100101010100000,
-  ]
-  function placeFormatInfo(m, s, ecc, mask) {
-    const fmt = FORMAT_POLYS[mask]
-    const bits = []
-    for(let i=14;i>=0;i--) bits.push((fmt>>i)&1)
-    // Place around top-left finder
-    const pos = [
-      [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],
-      [7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]
-    ]
-    pos.forEach(([r,c],i)=>{ m[r][c]=!!bits[i] })
-    // Place around bottom-left and top-right finders
-    for(let i=0;i<7;i++) m[s-1-i][8]=!!bits[i]
-    m[s-8][8]=true
-    for(let i=0;i<8;i++) m[8][s-8+i]=!!bits[14-i]
-  }
-
-  global.BAVNQr = { render: generateQR }
-})(window)
 
 // ── Sensitive fields — off by default ─────
 const SENSITIVE_FIELDS = ['email', 'phone', 'linkedin']
@@ -881,155 +646,117 @@ document.getElementById('btn-add-manual').addEventListener('click', () => {
   })
 })
 
-// ── WHATSAPP TAB ──────────────────────────
-const API_BASE_PUBLIC = 'https://bavn-backend.onrender.com'
-let waPolling = null
+// ── TELEGRAM FILL JOB POLLER ──────────────
+// Polls backend every 5s for jobs pushed from Telegram bot
+// When a job arrives, auto-fills the current form tab
+let fillJobPollTimer = null
 
-// fetchWithTimeout — handles Render cold start (~30s)
-async function fetchWithTimeout(url, timeoutMs = 35000) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const res = await fetch(url, { signal: controller.signal })
-    clearTimeout(timer)
-    return res
-  } catch (err) {
-    clearTimeout(timer)
-    throw err
-  }
+async function startFillJobPoller() {
+  if (fillJobPollTimer) return  // already running
+  fillJobPollTimer = setInterval(checkFillJob, 5000)
+  console.log('[BAVN] Fill job poller started')
 }
 
-// Render QR using built-in canvas renderer — no CDN needed
-function renderQRCode(text) {
-  return new Promise((resolve, reject) => {
+async function checkFillJob() {
+  try {
+    const data = await api('GET', '/api/telegram/fill-jobs')
+    const job  = data?.job
+    if (!job) return
+
+    console.log('[BAVN] Fill job received:', job.id)
+
+    // Get current active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!tab) return
+
+    // Check if tab URL matches job URL (loose match — same domain)
+    const jobDomain = new URL(job.form_url).hostname
+    const tabDomain = new URL(tab.url).hostname
+    const isMatch   = tabDomain.includes(jobDomain) || jobDomain.includes(tabDomain)
+
+    if (!isMatch) {
+      // Show notification that job is waiting
+      showFillJobBanner(job)
+      return
+    }
+
+    // Fill the form
+    await chrome.tabs.sendMessage(tab.id, {
+      type:    'FILL_AND_ADVANCE',
+      answers: job.answers
+    })
+
+    // Save answers to memory (same DB as Telegram)
     try {
-      const canvas = document.getElementById('wa-qr-canvas')
-      canvas.innerHTML = ''
-      BAVNQr.render(text, canvas, 200, '#006d77', '#ffffff')
-      resolve()
+      await api('POST', '/api/answers', {
+        questions: job.answers.map(a => a.question),
+        sourceUrl: job.form_url,
+        allowedFields: await getAIFields(),
+      })
     } catch(e) {
-      reject(e)
-    }
-  })
-}
-
-async function loadWhatsApp() {
-  const statusEl = document.getElementById('wa-status')
-  setStatus(statusEl, 'Checking connection…')
-  try {
-    const res  = await fetchWithTimeout(`${API_BASE_PUBLIC}/api/whatsapp/status`)
-    const data = await res.json()
-    if (data.connected) {
-      showWAConnected()
-      setStatus(statusEl, '● WhatsApp connected ✓', 'success')
-    } else {
-      showWADisconnected()
-      await loadQR()
-    }
-  } catch (err) {
-    const msg = err.name === 'AbortError'
-      ? 'Server waking up… please wait ⏳'
-      : 'Could not reach server — is backend running?'
-    setStatus(statusEl, msg, 'error')
-    // Retry after 8s (Render cold start can take up to 30s)
-    if (waPolling) clearTimeout(waPolling)
-    waPolling = setTimeout(loadWhatsApp, 8000)
-  }
-}
-
-async function loadQR() {
-  const statusEl  = document.getElementById('wa-status')
-  const qrWrap    = document.getElementById('wa-qr-wrap')
-  const qrLoad    = document.getElementById('wa-qr-loading')
-  const qrFallback= document.getElementById('wa-qr-fallback')
-  const qrLink    = document.getElementById('wa-qr-link')
-  const loadingTxt= document.getElementById('wa-qr-loading-text')
-
-  const QR_PAGE = `${API_BASE_PUBLIC}/api/whatsapp/qr-page`
-
-  // Show fallback link immediately — user can always open it
-  qrLink.href = QR_PAGE
-  qrFallback.style.display = 'block'
-
-  qrWrap.style.display = 'none'
-  qrLoad.style.display = 'block'
-  setStatus(statusEl, 'Connecting…')
-
-  try {
-    const res  = await fetchWithTimeout(`${API_BASE_PUBLIC}/api/whatsapp/qr`)
-    const data = await res.json()
-
-    if (data.connected) {
-      showWAConnected()
-      setStatus(statusEl, '● WhatsApp connected ✓', 'success')
-      return
-    }
-
-    if (!data.ready) {
-      loadingTxt.textContent = 'BOT INITIALISING… (~10 SEC)'
-      setStatus(statusEl, '⏳ Bot initialising — or open QR page above')
-      if (waPolling) clearTimeout(waPolling)
-      waPolling = setTimeout(loadQR, 4000)
-      return
-    }
-
-    if (data.qr) {
-      // Try to render inline
-      try {
-        await renderQRCode(data.qr)
-        qrLoad.style.display  = 'none'
-        qrWrap.style.display  = 'block'
-        setStatus(statusEl, 'Scan with WhatsApp ↑  or open QR page →', 'success')
-      } catch {
-        // Inline render failed — fallback link is already visible
-        qrLoad.style.display = 'none'
-        setStatus(statusEl, 'Open the QR page above to scan ↑', 'success')
+      // Save manually if generate endpoint fails
+      for (const a of job.answers) {
+        await api('POST', '/api/memory/manual', {
+          question: a.question,
+          answer:   a.answer,
+        }).catch(() => {})
       }
-      if (waPolling) clearTimeout(waPolling)
-      waPolling = setTimeout(loadWhatsApp, 6000)
-      return
     }
 
-    loadingTxt.textContent = data.message || 'WAITING FOR QR…'
-    setStatus(statusEl, 'Waiting for QR…')
-    if (waPolling) clearTimeout(waPolling)
-    waPolling = setTimeout(loadQR, 4000)
+    // Mark job as done
+    await api('POST', `/api/telegram/fill-jobs/${job.id}/done`, {})
 
-  } catch (err) {
-    const msg = err.name === 'AbortError'
-      ? 'Server waking up… open QR page above ↑'
-      : 'Error — open QR page above ↑'
-    setStatus(statusEl, msg, 'error')
-    if (waPolling) clearTimeout(waPolling)
-    waPolling = setTimeout(loadQR, 8000)
+    // Update UI
+    currentAnswers   = job.answers
+    currentQuestions = job.answers.map(a => a.question)
+    renderAnswers(job.answers)
+    setStatus(document.getElementById('autofill-status'), '✓ Filled from Telegram ✓', 'success')
+
+    // Invalidate memory cache so Memory tab shows latest
+    localCache.memory   = null
+    localCache.memoryTs = 0
+
+    hideFillJobBanner()
+
+  } catch(e) {
+    // Silent fail — poller keeps running
   }
 }
 
-function showWAConnected() {
-  document.getElementById('wa-connected-view').style.display = 'block'
-  document.getElementById('wa-disconnected-view').style.display = 'none'
-}
-
-function showWADisconnected() {
-  document.getElementById('wa-connected-view').style.display = 'none'
-  document.getElementById('wa-disconnected-view').style.display = 'block'
-}
-
-document.getElementById('btn-wa-refresh')?.addEventListener('click', async () => {
-  document.getElementById('wa-qr-wrap').style.display = 'none'
-  document.getElementById('wa-qr-loading').style.display = 'block'
-  document.getElementById('wa-qr-canvas').innerHTML = ''
-  await loadQR()
-})
-
-document.getElementById('btn-wa-disconnect')?.addEventListener('click', async () => {
-  showWADisconnected()
-  await loadQR()
-})
-
-// Load WhatsApp tab when clicked
-document.querySelectorAll('.tab').forEach(tab => {
-  if (tab.dataset.tab === 'whatsapp') {
-    tab.addEventListener('click', loadWhatsApp)
+function showFillJobBanner(job) {
+  let banner = document.getElementById('fill-job-banner')
+  if (!banner) {
+    banner = document.createElement('div')
+    banner.id = 'fill-job-banner'
+    banner.style.cssText = `
+      position:fixed;bottom:0;left:0;right:0;z-index:999;
+      background:#006d77;color:#fff;padding:10px 14px;
+      display:flex;align-items:center;gap:10px;font-size:10px;
+    `
+    document.body.appendChild(banner)
   }
+  const domain = new URL(job.form_url).hostname.replace('www.','')
+  banner.innerHTML = `
+    <div style="flex:1">📋 Telegram job ready — open <b>${domain}</b> to auto-fill</div>
+    <button onclick="dismissFillJob('${job.id}')"
+      style="background:rgba(255,255,255,0.2);border:none;color:#fff;
+      padding:4px 10px;font-family:inherit;font-size:9px;cursor:pointer;
+      letter-spacing:1px;text-transform:uppercase;">Dismiss</button>
+  `
+}
+
+async function dismissFillJob(jobId) {
+  hideFillJobBanner()
+  await api('POST', `/api/telegram/fill-jobs/${jobId}/done`, {})
+}
+
+function hideFillJobBanner() {
+  document.getElementById('fill-job-banner')?.remove()
+}
+
+// Start poller when logged in
+document.addEventListener('DOMContentLoaded', () => {
+  chrome.runtime.sendMessage({ type: 'GET_AUTH' }).then(({ loggedIn }) => {
+    if (loggedIn) startFillJobPoller()
+  }).catch(() => {})
 })
