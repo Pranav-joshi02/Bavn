@@ -34,8 +34,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   position:fixed;top:0;left:0;right:0;height:2px;z-index:999;
   pointer-events:none;overflow:hidden;background:transparent;}
 .progress-bar.active{background:rgba(131,197,190,0.25);}
-.progress-fill{
-  height:100%;width:0%;
+.progress-fill{height:100%;width:0%;
   background:linear-gradient(90deg,var(--teal),var(--teal2),var(--coral));}
 .progress-bar.active .progress-fill{
   animation:progress-sweep 2s ease-in-out infinite;}
@@ -49,7 +48,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;align-items:center;
   justify-content:center;height:100vh;gap:0;padding:40px 28px;
   background:linear-gradient(160deg,#edf6f9,#e0f2f5);}
-
 .logo{font-family:'DM Serif Display',serif;font-size:40px;font-style:italic;
   color:var(--teal);margin-bottom:6px;letter-spacing:1px;}
 .logo em{font-style:normal;color:var(--coral);}
@@ -61,24 +59,26 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 /* ── APP VIEW ──────────────────────────── */
 #app-view{display:none;flex-direction:column;height:100vh;}
 
+/* ── TELEGRAM BANNER ───────────────────── */
+#tg-banner{
+  display:none;align-items:center;gap:10px;
+  background:#e8f4ff;border-bottom:1px solid #b3d4f0;
+  padding:10px 14px;flex-shrink:0;}
+
 /* ── HEADER ────────────────────────────── */
 .header{
   display:flex;align-items:center;justify-content:space-between;
   padding:10px 14px;border-bottom:1px solid var(--border);
   background:var(--teal);flex-shrink:0;position:relative;}
-
 .header-left{display:flex;align-items:center;gap:10px;}
 .logo-sm{font-family:'DM Serif Display',serif;font-size:19px;font-style:italic;
   color:#fff;letter-spacing:1px;}
 .logo-sm em{font-style:normal;color:var(--blush);}
-
-/* question count chip */
 .q-chip{
   display:flex;align-items:center;justify-content:center;
   background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);
   color:#fff;font-size:9px;letter-spacing:1px;padding:2px 7px;min-width:28px;}
 .q-chip.hidden{display:none;}
-
 .header-right{display:flex;align-items:center;gap:8px;}
 .live-pill{display:flex;align-items:center;gap:5px;padding:3px 8px;
   border:1px solid rgba(255,255,255,0.25);font-size:8px;letter-spacing:1.5px;
@@ -100,8 +100,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   position:relative;white-space:nowrap;}
 .tab.active{color:var(--teal);border-bottom-color:var(--teal);}
 .tab:hover:not(.active){color:var(--muted2);}
-
-/* coral warning dot on profile tab */
 .tab-warn-dot{
   position:absolute;top:5px;right:4px;
   width:5px;height:5px;border-radius:50%;background:var(--coral);
@@ -130,11 +128,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .q-card.empty::before{background:var(--border2);}
 .q-card.generating{animation:card-pulse 1s ease-in-out infinite;}
 @keyframes card-pulse{0%,100%{opacity:0.6}50%{opacity:0.3}}
-
 .q-label{padding:8px 12px 3px;font-size:9.5px;color:var(--muted2);line-height:1.5;}
 .q-answer{padding:0 12px 8px;font-size:11px;color:var(--text);line-height:1.65;}
 .q-answer.empty{color:var(--muted);font-style:italic;}
-
 .q-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;
   font-size:7.5px;letter-spacing:2px;text-transform:uppercase;margin:0 12px 5px;}
 .q-badge::before{content:'';width:4px;height:4px;border-radius:50%;}
@@ -142,7 +138,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .q-badge.memory::before{background:var(--coral);}
 .q-badge.generated{color:var(--teal);border:1px solid rgba(0,109,119,0.25);background:rgba(0,109,119,0.07);}
 .q-badge.generated::before{background:var(--teal);}
-
 .empty-state{text-align:center;color:var(--muted);font-size:11px;padding:40px 20px;line-height:2;}
 .empty-icon{font-size:24px;margin-bottom:10px;opacity:0.5;}
 
@@ -194,40 +189,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   color:var(--muted);cursor:pointer;font-size:14px;transition:color 0.15s;line-height:1;}
 .mem-del:hover{color:var(--error);}
 
-/* ── PROFILE ────────────────────────────── */
-.profile-form{display:flex;flex-direction:column;gap:10px;}
-.field-group{display:flex;flex-direction:column;gap:3px;}
-.field-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;}
-.field-label{font-size:8.5px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase;}
-.field-input{background:var(--surface2);border:1px solid var(--border);
-  padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;
-  font-size:11px;outline:none;transition:border-color 0.15s;resize:vertical;width:100%;}
-.field-input:focus{border-color:var(--teal);box-shadow:0 0 0 2px rgba(0,109,119,0.08);}
-.field-input::placeholder{color:var(--muted);}
-
-.privacy-note{font-size:9.5px;color:var(--muted2);background:rgba(0,109,119,0.05);
-  border:1px solid rgba(0,109,119,0.15);border-left:3px solid var(--teal);
-  padding:9px 11px;line-height:1.7;margin-bottom:10px;}
-.privacy-warn{font-size:9.5px;color:#7a2e10;background:rgba(226,149,120,0.1);
-  border:1px solid rgba(226,149,120,0.35);border-left:3px solid var(--coral);
-  padding:9px 11px;line-height:1.7;margin-bottom:10px;
-  display:none;align-items:flex-start;gap:7px;}
-.privacy-warn.show{display:flex;}
-
-.toggle-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;}
-.toggle-wrap input[type="checkbox"]{width:11px;height:11px;accent-color:var(--teal);cursor:pointer;}
-.toggle-label{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
-.toggle-wrap:has(input:checked) .toggle-label{color:var(--teal);}
-
-/* sensitive field on = coral label */
-.field-group.sensitive-on .field-label{color:var(--coral);}
-.field-group.sensitive-on .field-input{border-color:rgba(226,149,120,0.4);}
-
-/* ── SKELETON ───────────────────────────── */
-.skeleton{background:var(--surface);border:1px solid var(--border);
-  animation:skeleton-pulse 1.5s ease-in-out infinite;}
-@keyframes skeleton-pulse{0%,100%{opacity:0.8}50%{opacity:0.35}}
-
 /* ── LEARN ──────────────────────────────── */
 .learn-intro{font-size:10px;color:var(--muted2);background:rgba(0,109,119,0.04);
   border:1px solid rgba(0,109,119,0.12);border-left:3px solid var(--teal);
@@ -256,17 +217,35 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .manual-form textarea:focus,.manual-form input:focus{border-color:var(--teal);}
 .manual-label{font-size:8.5px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase;}
 
-/* ── WHATSAPP ───────────────────────────── */
-.wa-command{background:var(--surface);border:1px solid var(--border);
-  border-left:3px solid var(--teal2);padding:9px 12px;
-  font-size:10px;color:var(--muted2);line-height:1.6;margin-bottom:5px;}
-.wa-connected-icon{width:46px;height:46px;border:2px solid var(--teal2);
-  border-radius:50%;display:flex;align-items:center;justify-content:center;
-  margin:0 auto 12px;font-size:18px;color:var(--teal);background:rgba(131,197,190,0.12);}
-#wa-qr-wrap{background:#fff;border:1px solid var(--border2);
-  padding:16px;text-align:center;margin-bottom:14px;display:none;}
-#wa-qr-wrap canvas{max-width:186px;width:100%;height:auto;}
-#wa-qr-loading{padding:4px 0 12px;}
+/* ── PROFILE ────────────────────────────── */
+.profile-form{display:flex;flex-direction:column;gap:10px;}
+.field-group{display:flex;flex-direction:column;gap:3px;}
+.field-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;}
+.field-label{font-size:8.5px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase;}
+.field-input{background:var(--surface2);border:1px solid var(--border);
+  padding:8px 10px;color:var(--text);font-family:'DM Mono',monospace;
+  font-size:11px;outline:none;transition:border-color 0.15s;resize:vertical;width:100%;}
+.field-input:focus{border-color:var(--teal);box-shadow:0 0 0 2px rgba(0,109,119,0.08);}
+.field-input::placeholder{color:var(--muted);}
+.privacy-note{font-size:9.5px;color:var(--muted2);background:rgba(0,109,119,0.05);
+  border:1px solid rgba(0,109,119,0.15);border-left:3px solid var(--teal);
+  padding:9px 11px;line-height:1.7;margin-bottom:10px;}
+.privacy-warn{font-size:9.5px;color:#7a2e10;background:rgba(226,149,120,0.1);
+  border:1px solid rgba(226,149,120,0.35);border-left:3px solid var(--coral);
+  padding:9px 11px;line-height:1.7;margin-bottom:10px;
+  display:none;align-items:flex-start;gap:7px;}
+.privacy-warn.show{display:flex;}
+.toggle-wrap{display:flex;align-items:center;gap:5px;cursor:pointer;}
+.toggle-wrap input[type="checkbox"]{width:11px;height:11px;accent-color:var(--teal);cursor:pointer;}
+.toggle-label{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.toggle-wrap:has(input:checked) .toggle-label{color:var(--teal);}
+.field-group.sensitive-on .field-label{color:var(--coral);}
+.field-group.sensitive-on .field-input{border-color:rgba(226,149,120,0.4);}
+
+/* ── SKELETON ───────────────────────────── */
+.skeleton{background:var(--surface);border:1px solid var(--border);
+  animation:skeleton-pulse 1.5s ease-in-out infinite;}
+@keyframes skeleton-pulse{0%,100%{opacity:0.8}50%{opacity:0.35}}
 </style>
 </head>
 <body>
@@ -274,7 +253,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 <!-- PROGRESS BAR -->
 <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
 
-<!-- ── LOGIN VIEW ──────────────────────── -->
+<!-- ── LOGIN VIEW ── -->
 <div id="login-view">
   <div class="logo">B<em>A</em>VN</div>
   <div class="tagline">Built-in Autofill<br>&amp; Verification Node</div>
@@ -291,9 +270,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   <div id="login-status"></div>
 </div>
 
-<!-- ── APP VIEW ───────────────────────── -->
+<!-- ── APP VIEW ── -->
 <div id="app-view">
 
+  <!-- Telegram banner — shown once after first login -->
+  <div id="tg-banner" style="display:none;align-items:center;gap:10px;background:#e8f4ff;border-bottom:1px solid #b3d4f0;padding:10px 14px;flex-shrink:0;">
+    <div style="font-size:18px;line-height:1;flex-shrink:0;">✈️</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:11px;font-weight:500;color:#0d3b42;margin-bottom:2px;">Use BAVN on Telegram</div>
+      <div style="font-size:10px;color:#4d8f99;line-height:1.5;">Fill forms &amp; write reviews from chat</div>
+    </div>
+    <a id="tg-banner-btn" href="#" target="_blank"
+      style="flex-shrink:0;background:#006d77;color:#fff;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:6px 10px;text-decoration:none;white-space:nowrap;">
+      Open Bot
+    </a>
+    <button id="tg-banner-dismiss"
+      style="flex-shrink:0;background:none;border:none;font-size:16px;color:#4d8f99;cursor:pointer;padding:0 4px;line-height:1;">×</button>
+  </div>
+
+  <!-- Header -->
   <div class="header">
     <div class="header-left">
       <div class="logo-sm">B<em>A</em>VN</div>
@@ -305,18 +300,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);
     </div>
   </div>
 
+  <!-- Tabs -->
   <div class="tabs">
     <button class="tab active" data-tab="autofill">Fill</button>
     <button class="tab" data-tab="memory">Memory</button>
     <button class="tab" data-tab="learn">Learn</button>
-    <button class="tab" data-tab="whatsapp">WA Bot</button>
     <button class="tab" data-tab="profile" id="tab-profile">
       Profile
       <div class="tab-warn-dot" id="profile-warn-dot"></div>
     </button>
   </div>
 
-  <!-- ── AUTOFILL ── -->
+  <!-- ── FILL panel ── -->
   <div class="panel active" id="panel-autofill">
     <div class="scroll">
       <div class="url-badge" id="current-url">Scanning page…</div>
@@ -338,7 +333,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
     </div>
   </div>
 
-  <!-- ── MEMORY ── -->
+  <!-- ── MEMORY panel ── -->
   <div class="panel" id="panel-memory">
     <div class="scroll">
       <div id="memory-list" class="memory-list">
@@ -349,7 +344,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
     </div>
   </div>
 
-  <!-- ── LEARN ── -->
+  <!-- ── LEARN panel ── -->
   <div class="panel" id="panel-learn">
     <div class="scroll">
       <div class="learn-intro">BAVN learns from answers you type. Read from the current page or add manually to build your personal knowledge base.</div>
@@ -362,69 +357,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
     </div>
   </div>
 
-  <!-- ── WHATSAPP ── -->
-  <div class="panel" id="panel-whatsapp">
-    <div class="scroll">
-
-      <div id="wa-connected-view" style="display:none">
-        <div style="text-align:center;padding:20px 0 18px">
-          <div class="wa-connected-icon">✓</div>
-          <div style="font-family:'DM Serif Display',serif;font-size:17px;font-style:italic;color:var(--teal);margin-bottom:6px;">Bot Active</div>
-          <div style="font-size:10px;color:var(--muted2);line-height:2;">Send any form link or review request<br>to BAVN on WhatsApp.</div>
-        </div>
-        <div class="section-label">Commands</div>
-        <div class="wa-command">📋 &nbsp;<b>hi form</b> → fill &amp; submit a form</div>
-        <div class="wa-command">⭐ &nbsp;<b>hi review</b> → write &amp; post a review</div>
-        <div class="wa-command">🧠 &nbsp;<b>memory</b> → your saved answers</div>
-        <div class="wa-command">🔐 &nbsp;<b>accounts</b> → manage Google accounts</div>
-        <div class="wa-command">❓ &nbsp;<b>help</b> → all commands</div>
-        <div style="margin-top:14px">
-          <button class="btn btn-outline" id="btn-wa-disconnect" style="font-size:10px;padding:9px;">Disconnect</button>
-        </div>
-      </div>
-
-      <div id="wa-disconnected-view">
-        <div style="text-align:center;padding:18px 0 16px">
-          <div style="width:46px;height:46px;border:1.5px solid var(--teal);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;opacity:0.7;">💬</div>
-          <div style="font-family:'DM Serif Display',serif;font-size:17px;font-style:italic;color:var(--text);margin-bottom:6px;">Connect WhatsApp</div>
-          <div style="font-size:10px;color:var(--muted2);line-height:2;">Open the QR page in your browser<br>and scan with WhatsApp.</div>
-        </div>
-
-        <!-- QR inline (tries to load in sidebar) -->
-        <div id="wa-qr-wrap" style="display:none;background:#fff;border:1px solid var(--border2);padding:16px;text-align:center;margin-bottom:12px;">
-          <canvas id="wa-qr-canvas"></canvas>
-        </div>
-        <div id="wa-qr-loading" style="text-align:center;padding:12px 0 16px;">
-          <div class="skeleton" style="height:160px;margin-bottom:8px;"></div>
-          <div style="font-size:9px;color:var(--muted);letter-spacing:1px;" id="wa-qr-loading-text">CONNECTING…</div>
-        </div>
-
-        <!-- Fallback: open QR in browser tab -->
-        <div id="wa-qr-fallback" style="display:none;margin-bottom:12px;">
-          <div style="font-size:10px;color:var(--muted2);text-align:center;line-height:1.8;margin-bottom:10px;">
-            QR ready — open in browser to scan:
-          </div>
-          <a id="wa-qr-link" href="#" target="_blank" class="btn btn-primary"
-            style="display:block;text-align:center;text-decoration:none;padding:10px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;background:var(--teal);color:#fff;">
-            ↗ &nbsp;Open QR Page
-          </a>
-        </div>
-
-        <div class="section-label">Setup Steps</div>
-        <div class="wa-command">1 &nbsp;Click "Open QR Page" above</div>
-        <div class="wa-command">2 &nbsp;Open WhatsApp → Settings</div>
-        <div class="wa-command">3 &nbsp;Linked Devices → Link a Device</div>
-        <div class="wa-command">4 &nbsp;Scan the QR → bot is active ✓</div>
-      </div>
-
-    </div>
-    <div class="footer">
-      <div class="status-bar" id="wa-status"></div>
-      <button class="btn btn-primary" id="btn-wa-refresh">↻  Refresh QR Code</button>
-    </div>
-  </div>
-
-  <!-- ── PROFILE ── -->
+  <!-- ── PROFILE panel ── -->
   <div class="panel" id="panel-profile">
     <div class="scroll">
       <div class="privacy-warn" id="privacy-warn">

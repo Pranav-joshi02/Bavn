@@ -149,7 +149,12 @@ async function handleMessage(chatId, userId, text) {
 
   if (low === '/start' || low === '/help' || low === 'help') {
     await sendButtons(chatId,
-      `👋 *Welcome to BAVN Bot!*\n\nI can help you fill forms and write reviews using your saved profile.\n\nWhat would you like to do?`,
+      `👋 *Welcome to BAVN Bot!*\n\n` +
+      `📋 *Fill Form* — paste a form URL, I generate all answers\n` +
+      `⭐ *Write Review* — describe your experience, I write it\n` +
+      `🧠 *Memory* — see your saved answers\n` +
+      `🔗 *Accounts* — manage linked Google accounts\n\n` +
+      `Tap a button to get started 👇`,
       [['📋 Fill Form', '⭐ Write Review'], ['🧠 Memory', '🔗 Accounts']]
     )
     return
@@ -587,9 +592,23 @@ export default async function telegramRoute(app) {
       .eq('telegram_id', telegramId).single()
 
     if (!profile) {
-      await sendMessage(chatId,
-        `👋 Hey! I don't recognise your Telegram account.\n\n*To link your account:*\n1. Install the BAVN Chrome extension\n2. Go to Profile tab\n3. Add your Telegram ID: \`${telegramId}\`\n4. Come back and say /start 🚀`
-      )
+      await tg('sendMessage', {
+        chat_id:    chatId,
+        parse_mode: 'Markdown',
+        text: `👋 Hey! I don't recognise your Telegram account yet.\n\n` +
+              `*Your Telegram ID is:*\n\`${telegramId}\`\n\n` +
+              `*To link your account:*\n` +
+              `1. Open the BAVN Chrome extension\n` +
+              `2. Go to *Profile* tab\n` +
+              `3. Paste your ID above into the *Telegram ID* field\n` +
+              `4. Click *Save Profile*\n` +
+              `5. Come back and send /start 🚀`,
+        reply_markup: {
+          keyboard: [[{ text: '/start' }]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        }
+      })
       return
     }
 
