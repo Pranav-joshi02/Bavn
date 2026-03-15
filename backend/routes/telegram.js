@@ -340,41 +340,38 @@ async function handleMessage(chatId, userId, text) {
     }
     sess.formUrl = msg
     sess.state   = 'generating_form'
-    await sendMessage(chatId, `⏳ Scanning form and generating answers...`)
+    await sendMessage(chatId, `🔍 Scanning form questions...`)
 
     const { data: profile } = await supabase
       .from('profiles').select('*').eq('user_id', userId).single()
 
-    // Scrape with 30s timeout — always respond even if scraper fails
+    // Scrape questions — 25s max
     let questions = []
     try {
-      const scrapePromise = scrapeFormQuestions(sess.formUrl, userId)
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Scrape timeout')), 30000)
-      )
-      const result = await Promise.race([scrapePromise, timeoutPromise])
+      const result = await Promise.race([
+        scrapeFormQuestions(sess.formUrl, userId),
+        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 25000))
+      ])
       questions = result.questions || []
-      console.log(`[BAVN TG] Scraped ${questions.length} questions from ${sess.formUrl}`)
     } catch(e) {
-      console.error('[BAVN TG] Scrape error:', e.message)
+      console.error('[BAVN TG] Scrape failed:', e.message)
     }
 
     if (!questions.length) {
-      // Could not scrape — ask user to type questions manually
       sess.state = 'awaiting_manual_questions'
       await sendMessage(chatId,
-        `⚠️ Couldn't auto-detect questions from this form.\n\n` +
-        `Please type the questions manually, one per line:\n\n` +
-        `_e.g._\n` +
+        `⚠️ Couldn't auto-detect questions.\n\n` +
+        `Type the questions below, *one per line*:\n\n` +
         `_Why do you want to apply?_\n` +
         `_What is your expected stipend?_\n\n` +
-        `_Or send /cancel to start over._`
+        `_Or /cancel to start over_`
       )
       return
     }
 
     sess.questions = questions
     sess.state     = 'form_preview'
+    await sendMessage(chatId, `✅ Found *${questions.length} questions* — generating answers...`)
 
     let answers
     try {
@@ -386,25 +383,29 @@ async function handleMessage(chatId, userId, text) {
       return
     }
 
-    // Push fill job to Supabase — extension will pick this up
     await supabase.from('fill_jobs').insert({
-      user_id:  userId,
-      status:   'pending',
-      form_url: sess.formUrl,
-      answers,
+      user_id: userId, status: 'pending',
+      form_url: sess.formUrl, answers,
     })
-
-    // Auto-save answers to memory
     for (const a of answers) {
       await supabase.from('answers').upsert({
-        user_id:    userId,
-        question:   a.question,
-        answer:     a.answer,
-        source_url: sess.formUrl,
+        user_id: userId, question: a.question,
+        answer: a.answer, source_url: sess.formUrl,
       }, { onConflict: 'user_id,question' })
     }
 
-    const acctLine = sess.account ? `\n_Account: ${sess.account.email}_` : ''
+    const acctLine  = sess.account ? `\n_Account: ${sess.account.email}_` : ''
+    const hasS      = await hasSession(userId).catch(() => false)
+    const submitBtn = hasS ? '🚀 Auto-Submit' : '✅ Save to Memory'
+
+    await sendButtons(chatId,
+      `✅ *${answers.length} answers ready* 👇${acctLine}\n\n` +
+      `${formatAnswers(answers)}\n\n——\n` +
+      `📱 Open form in Chrome — extension auto-fills it`,
+      [[submitBtn, '👁 Preview All'], ['✏️ Change Answer', '❌ Cancel']]
+    )
+    return
+  }
     const hasS      = await hasSession(userId)
     const submitBtn = hasS ? '🚀 Auto-Submit' : '✅ Save to Memory'
 
@@ -634,8 +635,7 @@ async function handleMessage(chatId, userId, text) {
   }
 
   // Fallback
-  await showMainMenu(chatId)
-}
+
 
 // ── Account picker ────────────────────────
 async function pickAccount(chatId, userId, sess) {
