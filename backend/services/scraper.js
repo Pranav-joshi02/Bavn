@@ -9,9 +9,36 @@ import { supabase }   from './supabase.js'
 const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN
 const BROWSERLESS_WS    = `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`
 
+// ── Shared helpers ────────────────────────
+function clean(str) {
+  return String(str || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[*:]+$/, '')
+    .trim()
+}
+
+function isGoodQ(q) {
+  if (!q || q.length < 5 || q.length > 400) return false
+  return !/^(submit|cancel|next|back|upload|choose|select|yes|no|add|remove|\d+)$/i.test(q.trim())
+}
+
 // ── Main scraper ──────────────────────────
 export async function scrapeFormQuestions(url, userId = null) {
-  // Try Playwright scraping (JS-rendered forms)
+  const domain = new URL(url).hostname.toLowerCase()
+
+  // Google Forms — parse embedded JSON (no Playwright needed, very fast)
+  if (domain.includes('docs.google.com') || domain.includes('forms.gle')) {
+    try {
+      const result = await scrapeGoogleForms(url)
+      if (result.questions.length) return result
+    } catch(e) {
+      console.error('[BAVN Scraper] Google Forms error:', e.message)
+    }
+  }
+
+  // Try Playwright scraping for JS-rendered forms
   if (BROWSERLESS_TOKEN) {
     try {
       const result = await scrapeWithPlaywright(url, userId)
@@ -21,8 +48,50 @@ export async function scrapeFormQuestions(url, userId = null) {
     }
   }
 
-  // Fallback to static HTML scraping
+  // Final fallback — static HTML
   return scrapeWithFetch(url)
+}
+
+// ── Google Forms (JSON in page source) ────
+async function scrapeGoogleForms(url) {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    signal: AbortSignal.timeout(10000),
+  })
+  const html = await res.text()
+
+  const questions = []
+
+  // Method 1: FB_PUBLIC_LOAD_DATA_ JSON blob
+  const match = html.match(/FB_PUBLIC_LOAD_DATA_\s*=\s*(\[[\s\S]*?\]);\s*<\/script>/)
+  if (match) {
+    try {
+      const data  = JSON.parse(match[1])
+      const items = data?.[1]?.[1] || []
+      for (const item of items) {
+        const title = item?.[1]
+        const type  = item?.[3]  // 0=short text, 1=paragraph, 2=radio, etc
+        if (title && typeof title === 'string' && title.trim()) {
+          // Only text input types (0=short, 1=paragraph)
+          if ([0, 1].includes(type)) {
+            questions.push(clean(title))
+          }
+        }
+      }
+      if (questions.length) {
+        console.log(`[BAVN Scraper] Google Forms JSON: ${questions.length} questions`)
+        return { questions, error: null }
+      }
+    } catch(e) {}
+  }
+
+  // Method 2: Scrape visible question text from HTML
+  for (const m of html.matchAll(/class="[^"]*freebirdFormviewerViewItemsItemItemTitle[^"]*"[^>]*>([\s\S]{3,200}?)<\/div>/g)) {
+    const q = clean(m[1])
+    if (q && q.length >= 3) questions.push(q)
+  }
+
+  return { questions, error: questions.length ? null : 'No questions found' }
 }
 
 // ── Playwright scraper (JS-rendered) ──────
@@ -212,15 +281,6 @@ async function scrapeWithFetch(url) {
   } catch(e) {
     return { questions: [], error: e.message }
   }
-}
-
-function cleanHtml(str) {
-  return String(str || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/[*:]+$/, '').trim()
-}
-
-function isGoodQ(q) {
-  if (!q || q.length < 5 || q.length > 400) return false
-  return !/^(submit|cancel|next|back|upload|choose|select|yes|no|add|remove|\d+)$/i.test(q)
 }
 
 async function downloadSession(userId) {

@@ -339,17 +339,27 @@ async function handleMessage(chatId, userId, text) {
       return
     }
     sess.formUrl = msg
-    await sendMessage(chatId, `⏳ Generating answers...`)
-
-    // Scrape real questions from the form URL
+    sess.state   = 'generating_form'
     await sendMessage(chatId, `⏳ Scanning form and generating answers...`)
 
     const { data: profile } = await supabase
       .from('profiles').select('*').eq('user_id', userId).single()
 
-    const { questions, error: scrapeError } = await scrapeFormQuestions(sess.formUrl, userId)
+    // Scrape with 30s timeout — always respond even if scraper fails
+    let questions = []
+    try {
+      const scrapePromise = scrapeFormQuestions(sess.formUrl, userId)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Scrape timeout')), 30000)
+      )
+      const result = await Promise.race([scrapePromise, timeoutPromise])
+      questions = result.questions || []
+      console.log(`[BAVN TG] Scraped ${questions.length} questions from ${sess.formUrl}`)
+    } catch(e) {
+      console.error('[BAVN TG] Scrape error:', e.message)
+    }
 
-    if (scrapeError || !questions.length) {
+    if (!questions.length) {
       // Could not scrape — ask user to type questions manually
       sess.state = 'awaiting_manual_questions'
       await sendMessage(chatId,
@@ -357,12 +367,14 @@ async function handleMessage(chatId, userId, text) {
         `Please type the questions manually, one per line:\n\n` +
         `_e.g._\n` +
         `_Why do you want to apply?_\n` +
-        `_What is your expected stipend?_`
+        `_What is your expected stipend?_\n\n` +
+        `_Or send /cancel to start over._`
       )
       return
     }
+
     sess.questions = questions
-    sess.state = 'form_preview'
+    sess.state     = 'form_preview'
 
     let answers
     try {
@@ -379,10 +391,10 @@ async function handleMessage(chatId, userId, text) {
       user_id:  userId,
       status:   'pending',
       form_url: sess.formUrl,
-      answers:  answers,
+      answers,
     })
 
-    // Auto-save answers to memory immediately
+    // Auto-save answers to memory
     for (const a of answers) {
       await supabase.from('answers').upsert({
         user_id:    userId,
@@ -392,7 +404,7 @@ async function handleMessage(chatId, userId, text) {
       }, { onConflict: 'user_id,question' })
     }
 
-    const acctLine  = sess.account ? `\n_Account: ${sess.account.email}_` : ''
+    const acctLine = sess.account ? `\n_Account: ${sess.account.email}_` : ''
     const hasS      = await hasSession(userId)
     const submitBtn = hasS ? '🚀 Auto-Submit' : '✅ Save to Memory'
 
