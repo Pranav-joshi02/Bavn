@@ -3,7 +3,9 @@
 // Full Telegram bot — forms, reviews, memory,
 // Google account linking, extension bridge
 // ============================================
-import { supabase } from '../services/supabase.js'
+import { supabase }              from '../services/supabase.js'
+import { scrapeFormQuestions }   from '../services/scraper.js'
+import { fillAndSubmitForm, hasSession } from '../services/browser.js'
 import {
   generateAnswers,
   regenerateSingleAnswer,
@@ -277,6 +279,59 @@ async function handleMessage(chatId, userId, text) {
     return
   }
 
+  // ═══ FORM: MANUAL QUESTIONS ══════════════
+  if (sess.state === 'awaiting_manual_questions') {
+    // User typed questions manually, one per line
+    const questions = msg.split('\n')
+      .map(q => q.trim())
+      .filter(q => q.length >= 5)
+
+    if (!questions.length) {
+      await sendMessage(chatId, `Please type at least one question.`)
+      return
+    }
+
+    sess.questions = questions
+    sess.state = 'form_preview'
+    await sendMessage(chatId, `⏳ Generating answers for ${questions.length} question(s)...`)
+
+    const { data: profile } = await supabase
+      .from('profiles').select('*').eq('user_id', userId).single()
+
+    let answers
+    try {
+      answers = await generateAnswers(questions, profile)
+      sess.answers = answers
+    } catch(e) {
+      resetSession(chatId)
+      await showMainMenu(chatId, `Sorry, couldn't generate answers. Please try again.`)
+      return
+    }
+
+    await supabase.from('fill_jobs').insert({
+      user_id:  userId,
+      status:   'pending',
+      form_url: sess.formUrl,
+      answers,
+    })
+
+    for (const a of answers) {
+      await supabase.from('answers').upsert({
+        user_id: userId, question: a.question,
+        answer: a.answer, source_url: sess.formUrl,
+      }, { onConflict: 'user_id,question' })
+    }
+
+    const acctLine = sess.account ? `\n_Account: ${sess.account.email}_` : ''
+    await sendButtons(chatId,
+      `✅ *${answers.length} answers ready* 👇${acctLine}\n\n` +
+      `${formatAnswers(answers)}\n\n` +
+      `——\n📱 *Open the form in Chrome* — BAVN extension will auto-fill it`,
+      [['✅ Save to Memory', '👁 Preview All'], ['✏️ Change Answer', '❌ Cancel']]
+    )
+    return
+  }
+
   // ═══ FORM: AWAITING URL ══════════════════
   if (sess.state === 'awaiting_link') {
     if (!msg.match(/https?:\/\//)) {
@@ -286,16 +341,26 @@ async function handleMessage(chatId, userId, text) {
     sess.formUrl = msg
     await sendMessage(chatId, `⏳ Generating answers...`)
 
+    // Scrape real questions from the form URL
+    await sendMessage(chatId, `⏳ Scanning form and generating answers...`)
+
     const { data: profile } = await supabase
       .from('profiles').select('*').eq('user_id', userId).single()
 
-    // Placeholder questions — Phase 4 will scrape real ones via Puppeteer
-    const questions = [
-      'Why do you want to apply for this position?',
-      'Describe a technical challenge you solved.',
-      'What is your expected stipend?',
-      'When can you start?',
-    ]
+    const { questions, error: scrapeError } = await scrapeFormQuestions(sess.formUrl)
+
+    if (scrapeError || !questions.length) {
+      // Could not scrape — ask user to type questions manually
+      sess.state = 'awaiting_manual_questions'
+      await sendMessage(chatId,
+        `⚠️ Couldn't auto-detect questions from this form.\n\n` +
+        `Please type the questions manually, one per line:\n\n` +
+        `_e.g._\n` +
+        `_Why do you want to apply?_\n` +
+        `_What is your expected stipend?_`
+      )
+      return
+    }
     sess.questions = questions
     sess.state = 'form_preview'
 
@@ -327,14 +392,17 @@ async function handleMessage(chatId, userId, text) {
       }, { onConflict: 'user_id,question' })
     }
 
-    const acctLine = sess.account ? `\n_Account: ${sess.account.email}_` : ''
+    const acctLine  = sess.account ? `\n_Account: ${sess.account.email}_` : ''
+    const hasS      = await hasSession(userId)
+    const submitBtn = hasS ? '🚀 Auto-Submit' : '✅ Save to Memory'
+
     await sendButtons(chatId,
       `✅ *${answers.length} answers ready* 👇${acctLine}\n\n` +
-      `${formatAnswers(answers)}\n\n` +
-      `——\n` +
-      `📱 *Open the form in Chrome* — BAVN extension will auto-fill it\n` +
-      `_Or change an answer: "change Q2 make it shorter"_`,
-      [['✅ Save to Memory', '👁 Preview All'], ['✏️ Change Answer', '❌ Cancel']]
+      `${formatAnswers(answers)}\n\n——\n` +
+      (hasS
+        ? `📱 Open form in Chrome OR tap *Auto-Submit* to let me fill & submit it`
+        : `📱 *Open the form in Chrome* — BAVN extension will auto-fill it`),
+      [[submitBtn, '👁 Preview All'], ['✏️ Change Answer', '❌ Cancel']]
     )
     return
   }
@@ -342,6 +410,63 @@ async function handleMessage(chatId, userId, text) {
   // ═══ FORM: PREVIEW ═══════════════════════
   if (sess.state === 'form_preview') {
 
+    // ── Auto-Submit via Browserless ───────────
+    if (low === '🚀 auto-submit') {
+      await sendMessage(chatId, `🤖 Starting auto-submit...\n\n_Opening form in browser, filling fields and submitting. This takes ~30 seconds._`)
+
+      try {
+        const result = await fillAndSubmitForm({
+          userId,
+          formUrl: sess.formUrl,
+          answers: sess.answers,
+        })
+
+        // Save to memory
+        for (const a of sess.answers) {
+          await supabase.from('answers').upsert({
+            user_id: userId, question: a.question,
+            answer: a.answer, source_url: sess.formUrl,
+          }, { onConflict: 'user_id,question' })
+        }
+
+        resetSession(chatId)
+        await sendButtons(chatId,
+          `✅ *Form submitted!*\n\n` +
+          `📄 Pages filled: ${result.pagesCompleted}\n` +
+          `✏️ Fields filled: ${result.fieldsFilled}\n\n` +
+          `Answers saved to memory. Good luck! 🚀`,
+          [['📋 Fill Another Form', '⭐ Write Review']]
+        )
+
+      } catch(e) {
+        if (e.message === 'NO_SESSION') {
+          await sendButtons(chatId,
+            `⚠️ *No session found.*\n\n` +
+            `Run this command on your laptop first:\n` +
+            `\`\`\`\nnode scripts/capture-session.js your@email.com\n\`\`\`\n\n` +
+            `This logs you into Google once and saves the session.\n\n` +
+            `Or tap *Save to Memory* — extension will auto-fill instead.`,
+            [['✅ Save to Memory', '❌ Cancel']]
+          )
+        } else if (e.message === 'LOGIN_REQUIRED') {
+          await sendButtons(chatId,
+            `⚠️ *Login required.*\n\n` +
+            `Your session expired. Re-run the capture script:\n` +
+            `\`\`\`\nnode scripts/capture-session.js your@email.com\n\`\`\``,
+            [['✅ Save to Memory', '❌ Cancel']]
+          )
+        } else {
+          await sendButtons(chatId,
+            `❌ *Auto-submit failed:* ${e.message}\n\n` +
+            `Extension fill still works — open the form in Chrome.`,
+            [['✅ Save to Memory', '❌ Cancel']]
+          )
+        }
+      }
+      return
+    }
+
+    // ── Save to memory ─────────────────────────
     if (isSubmit(low) || low === '✅ save to memory') {
       for (const a of sess.answers) {
         await supabase.from('answers').upsert({
