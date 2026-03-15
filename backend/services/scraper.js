@@ -1,289 +1,233 @@
 // ============================================
 // BAVN.io — services/scraper.js
-// Scrapes form questions from any URL
-// Works for: Google Forms, Internshala,
-// Unstop, LinkedIn, Naukri, generic HTML forms
+// Scrapes form questions using Playwright
+// Handles JS-rendered forms (Internshala, etc)
 // ============================================
+import { hasSession } from './browser.js'
+import { supabase }   from './supabase.js'
+
+const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN
+const BROWSERLESS_WS    = `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`
 
 // ── Main scraper ──────────────────────────
-export async function scrapeFormQuestions(url) {
-  try {
-    const html = await fetchHtml(url)
-    if (!html) return { questions: [], error: 'Could not fetch page' }
-
-    const questions = extractQuestions(html, url)
-
-    if (!questions.length) {
-      return { questions: [], error: 'No questions found on this page' }
+export async function scrapeFormQuestions(url, userId = null) {
+  // Try Playwright scraping (JS-rendered forms)
+  if (BROWSERLESS_TOKEN) {
+    try {
+      const result = await scrapeWithPlaywright(url, userId)
+      if (result.questions.length) return result
+    } catch(e) {
+      console.error('[BAVN Scraper] Playwright failed:', e.message)
     }
+  }
 
+  // Fallback to static HTML scraping
+  return scrapeWithFetch(url)
+}
+
+// ── Playwright scraper (JS-rendered) ──────
+async function scrapeWithPlaywright(url, userId) {
+  const { chromium } = await import('playwright-core')
+
+  // Download session if available (for login-protected forms)
+  let storageState = undefined
+  if (userId) {
+    const session = await downloadSession(userId)
+    if (session) storageState = session
+  }
+
+  const browser = await chromium.connectOverCDP(BROWSERLESS_WS, {
+    timeout: 30000,
+  })
+
+  const context = await browser.newContext({
+    storageState,
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    viewport:  { width: 1280, height: 800 },
+  })
+
+  const page = await context.newPage()
+
+  try {
+    console.log(`[BAVN Scraper] Loading ${url}`)
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 })
+
+    // Wait for form fields to appear
+    await page.waitForSelector(
+      'input[type="text"], textarea, [contenteditable="true"], input[type="email"]',
+      { timeout: 8000 }
+    ).catch(() => {})
+
+    // Extra wait for dynamic content
+    await page.waitForTimeout(2000)
+
+    // Extract questions from live DOM
+    const questions = await page.evaluate(() => {
+      const results = []
+      const seen    = new Set()
+
+      function clean(str) {
+        return String(str || '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/[*:]+$/, '')
+          .trim()
+      }
+
+      function isGood(q) {
+        if (!q || q.length < 5 || q.length > 400) return false
+        const skip = /^(submit|cancel|next|back|upload|browse|choose|select all|yes|no|male|female|other|add|remove|save|continue|\d+)$/i
+        return !skip.test(q.trim())
+      }
+
+      const SKIP_TYPES = new Set(['hidden','submit','button','reset','image','file','checkbox','radio'])
+
+      // Strategy 1: label → input association
+      for (const label of document.querySelectorAll('label')) {
+        const text = clean(label.innerText || label.textContent)
+        if (!isGood(text) || seen.has(text)) continue
+
+        // Check label points to an editable field
+        const forId = label.getAttribute('for')
+        if (forId) {
+          const input = document.getElementById(forId)
+          if (!input) continue
+          if (input.type && SKIP_TYPES.has(input.type)) continue
+          seen.add(text)
+          results.push(text)
+          continue
+        }
+
+        // Label wraps an input
+        const input = label.querySelector('input, textarea, select, [contenteditable]')
+        if (input) {
+          if (input.type && SKIP_TYPES.has(input.type)) continue
+          seen.add(text)
+          results.push(text)
+        }
+      }
+
+      // Strategy 2: aria-label on inputs
+      for (const el of document.querySelectorAll('input, textarea')) {
+        if (el.type && SKIP_TYPES.has(el.type)) continue
+        const style = window.getComputedStyle(el)
+        if (style.display === 'none' || style.visibility === 'hidden') continue
+        if (!el.offsetParent) continue
+
+        const q = clean(el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') && document.getElementById(el.getAttribute('aria-labelledby'))?.innerText || '')
+        if (isGood(q) && !seen.has(q)) {
+          seen.add(q)
+          results.push(q)
+        }
+      }
+
+      // Strategy 3: question-like headings near inputs
+      for (const el of document.querySelectorAll('p, h1, h2, h3, h4, h5, div, span')) {
+        const text = clean(el.innerText || el.textContent)
+        if (!isGood(text) || seen.has(text) || text.length > 300) continue
+        if (!/^(why|what|how|describe|tell|explain|when|where|who|please|share|write|mention|list|give|state|provide)/i.test(text)) continue
+
+        // Must be near an input
+        const next = el.nextElementSibling
+        const hasInput = next?.querySelector?.('input, textarea, [contenteditable]') ||
+                         next?.matches?.('input, textarea') ||
+                         el.closest('div')?.querySelector?.('textarea, input[type="text"]')
+        if (hasInput) {
+          seen.add(text)
+          results.push(text)
+        }
+      }
+
+      // Strategy 4: placeholder text as fallback
+      for (const el of document.querySelectorAll('input[type="text"], textarea')) {
+        const style = window.getComputedStyle(el)
+        if (style.display === 'none' || !el.offsetParent) continue
+        const q = clean(el.placeholder)
+        if (isGood(q) && !seen.has(q) && q.length > 10) {
+          seen.add(q)
+          results.push(q)
+        }
+      }
+
+      // Strategy 5: Google Forms specific
+      for (const el of document.querySelectorAll('[data-params], .freebirdFormviewerViewItemsItemItemTitle, [role="heading"]')) {
+        const text = clean(el.innerText || el.textContent)
+        if (isGood(text) && !seen.has(text)) {
+          seen.add(text)
+          results.push(text)
+        }
+      }
+
+      return results.slice(0, 15)
+    })
+
+    await context.close()
+    await browser.close()
+
+    console.log(`[BAVN Scraper] Found ${questions.length} questions`)
     return { questions, error: null }
 
   } catch(e) {
-    console.error('[BAVN Scraper] Error:', e.message)
+    await context.close().catch(() => {})
+    await browser.close().catch(() => {})
+    throw e
+  }
+}
+
+// ── Static HTML fallback ──────────────────
+async function scrapeWithFetch(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept':     'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(10000),
+    })
+    const html = await res.text()
+
+    const questions = []
+    const seen      = new Set()
+
+    // Labels
+    for (const m of html.matchAll(/<label[^>]*>([\s\S]{5,200}?)<\/label>/gi)) {
+      const q = cleanHtml(m[1])
+      if (isGoodQ(q) && !seen.has(q)) { seen.add(q); questions.push(q) }
+    }
+
+    // Aria-labels
+    for (const m of html.matchAll(/aria-label="([^"]{5,200})"/gi)) {
+      const q = m[1].trim()
+      if (isGoodQ(q) && !seen.has(q)) { seen.add(q); questions.push(q) }
+    }
+
+    // Question-style text
+    for (const m of html.matchAll(/<[^>]+>\s*((?:Why|What|How|Describe|Tell|Explain|When|Please)[^<]{5,200})\s*</gi)) {
+      const q = cleanHtml(m[1])
+      if (isGoodQ(q) && !seen.has(q)) { seen.add(q); questions.push(q) }
+    }
+
+    return { questions: questions.slice(0, 15), error: questions.length ? null : 'No questions found' }
+
+  } catch(e) {
     return { questions: [], error: e.message }
   }
 }
 
-// ── Fetch HTML ────────────────────────────
-async function fetchHtml(url) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept':     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-    },
-    signal: AbortSignal.timeout(15000),
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.text()
+function cleanHtml(str) {
+  return String(str || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/[*:]+$/, '').trim()
 }
 
-// ── Extract questions from HTML ───────────
-function extractQuestions(html, url) {
-  const domain = new URL(url).hostname.toLowerCase()
-
-  // Platform-specific extractors first
-  if (domain.includes('docs.google.com') || domain.includes('forms.gle')) {
-    return extractGoogleForms(html)
-  }
-  if (domain.includes('internshala.com')) {
-    return extractInternshala(html)
-  }
-  if (domain.includes('unstop.com') || domain.includes('dare2compete.com')) {
-    return extractUnstop(html)
-  }
-  if (domain.includes('linkedin.com')) {
-    return extractLinkedIn(html)
-  }
-  if (domain.includes('naukri.com')) {
-    return extractNaukri(html)
-  }
-  if (domain.includes('typeform.com')) {
-    return extractTypeform(html)
-  }
-
-  // Generic fallback — works for most standard HTML forms
-  return extractGeneric(html)
+function isGoodQ(q) {
+  if (!q || q.length < 5 || q.length > 400) return false
+  return !/^(submit|cancel|next|back|upload|choose|select|yes|no|add|remove|\d+)$/i.test(q)
 }
 
-// ── Google Forms ──────────────────────────
-function extractGoogleForms(html) {
-  const questions = []
-
-  // Google Forms embeds question data as JSON in the page
-  // Pattern: FB_PUBLIC_LOAD_DATA_ = [...]
-  const dataMatch = html.match(/FB_PUBLIC_LOAD_DATA_\s*=\s*(\[[\s\S]*?\]);\s*<\/script>/)
-  if (dataMatch) {
-    try {
-      const data  = JSON.parse(dataMatch[1])
-      const items = data?.[1]?.[1] || []
-      for (const item of items) {
-        const title = item?.[1]
-        const type  = item?.[3]  // 0=short, 1=paragraph, 2=multiple choice etc
-        if (title && typeof title === 'string' && title.trim()) {
-          const isText = [0, 1].includes(type)
-          if (isText) questions.push(clean(title))
-        }
-      }
-      if (questions.length) return questions
-    } catch(e) {}
-  }
-
-  // Fallback: scrape visible question text
-  const matches = html.matchAll(/class="[^"]*freebirdFormviewerViewItemsItemItemTitle[^"]*"[^>]*>([^<]{3,200})<\/div>/g)
-  for (const m of matches) {
-    const q = clean(m[1])
-    if (q && q.length >= 3) questions.push(q)
-  }
-
-  return questions
-}
-
-// ── Internshala ───────────────────────────
-function extractInternshala(html) {
-  const questions = []
-
-  // Internshala application questions are in specific divs
-  const patterns = [
-    /class="[^"]*assessment_question[^"]*"[^>]*>[\s\S]*?<[^>]*>\s*([^<]{10,300})\s*</g,
-    /class="[^"]*question[^"]*"[^>]*>\s*<[^>]*>\s*([^<]{10,300})\s*</g,
-    /<label[^>]*>\s*([^<]{10,200})\s*<\/label>/g,
-    // Cover letter / SOP questions
-    /Why\s+do\s+you\s+want[^<]{0,200}/gi,
-    /Describe[^<]{0,200}/gi,
-    /What\s+(?:are|is|makes|do)[^<]{0,200}/gi,
-    /Tell\s+us[^<]{0,200}/gi,
-  ]
-
-  for (const pattern of patterns) {
-    const matches = [...html.matchAll(pattern)]
-    for (const m of matches) {
-      const q = clean(m[1] || m[0])
-      if (q && q.length >= 10 && q.length < 300 && !questions.includes(q)) {
-        questions.push(q)
-      }
-    }
-  }
-
-  // Also grab textarea labels which are common in Internshala
-  const labelMatches = html.matchAll(/<label[^>]*for="[^"]*"[^>]*>\s*([\s\S]{10,200}?)\s*<\/label>/g)
-  for (const m of labelMatches) {
-    const q = clean(m[1])
-    if (q && q.length >= 10 && !questions.includes(q)) {
-      questions.push(q)
-    }
-  }
-
-  return questions.slice(0, 10)
-}
-
-// ── Unstop ────────────────────────────────
-function extractUnstop(html) {
-  const questions = []
-
-  const patterns = [
-    /<h[1-6][^>]*class="[^"]*question[^"]*"[^>]*>([\s\S]{5,300}?)<\/h/g,
-    /class="[^"]*form[-_]question[^"]*"[^>]*>([\s\S]{5,300}?)<\//g,
-    /<label[^>]*>\s*([\s\S]{10,200}?)\s*<\/label>/g,
-  ]
-
-  for (const pattern of patterns) {
-    for (const m of [...html.matchAll(pattern)]) {
-      const q = clean(m[1])
-      if (q && q.length >= 5 && !questions.includes(q)) questions.push(q)
-    }
-  }
-
-  return questions.slice(0, 10)
-}
-
-// ── LinkedIn Easy Apply ───────────────────
-function extractLinkedIn(html) {
-  const questions = []
-
-  const patterns = [
-    /<label[^>]*class="[^"]*artdeco[^"]*"[^>]*>([\s\S]{3,200}?)<\/label>/g,
-    /<h3[^>]*>([\s\S]{5,200}?)<\/h3>/g,
-    /aria-label="([^"]{5,200})"/g,
-  ]
-
-  for (const pattern of patterns) {
-    for (const m of [...html.matchAll(pattern)]) {
-      const q = clean(m[1])
-      if (q && q.length >= 5 && !questions.includes(q)) questions.push(q)
-    }
-  }
-
-  return questions.slice(0, 10)
-}
-
-// ── Naukri ────────────────────────────────
-function extractNaukri(html) {
-  const questions = []
-
-  const patterns = [
-    /<label[^>]*>([\s\S]{5,200}?)<\/label>/g,
-    /class="[^"]*question[^"]*"[^>]*>([\s\S]{5,200}?)<\//g,
-  ]
-
-  for (const pattern of patterns) {
-    for (const m of [...html.matchAll(pattern)]) {
-      const q = clean(m[1])
-      if (q && q.length >= 5 && !questions.includes(q)) questions.push(q)
-    }
-  }
-
-  return questions.slice(0, 10)
-}
-
-// ── Typeform ──────────────────────────────
-function extractTypeform(html) {
-  const questions = []
-
-  // Typeform embeds data as JSON
-  const match = html.match(/window\.__REDUX_STATE__\s*=\s*(\{[\s\S]*?\});\s*<\/script>/)
-  if (match) {
-    try {
-      const data   = JSON.parse(match[1])
-      const fields = data?.form?.fields || []
-      for (const f of fields) {
-        if (f.title && ['short_text','long_text','multiple_choice'].includes(f.type)) {
-          questions.push(clean(f.title))
-        }
-      }
-      if (questions.length) return questions
-    } catch(e) {}
-  }
-
-  return extractGeneric(html)
-}
-
-// ── Generic HTML form scraper ─────────────
-// Works on most standard forms
-function extractGeneric(html) {
-  const questions = []
-  const seen      = new Set()
-
-  // Strategy 1: <label> tags — most reliable
-  for (const m of html.matchAll(/<label[^>]*>([\s\S]{3,200}?)<\/label>/gi)) {
-    const q = clean(m[1])
-    if (isGoodQuestion(q) && !seen.has(q)) {
-      seen.add(q)
-      questions.push(q)
-    }
-  }
-
-  // Strategy 2: aria-label on inputs
-  for (const m of html.matchAll(/(?:input|textarea|select)[^>]*aria-label="([^"]{3,200})"/gi)) {
-    const q = clean(m[1])
-    if (isGoodQuestion(q) && !seen.has(q)) {
-      seen.add(q)
-      questions.push(q)
-    }
-  }
-
-  // Strategy 3: placeholder text (often has the question)
-  for (const m of html.matchAll(/(?:input|textarea)[^>]*placeholder="([^"]{10,200})"/gi)) {
-    const q = clean(m[1])
-    if (isGoodQuestion(q) && !seen.has(q)) {
-      seen.add(q)
-      questions.push(q)
-    }
-  }
-
-  // Strategy 4: headings near inputs (question-style text)
-  for (const m of html.matchAll(/<(?:h[1-6]|p|div)[^>]*>\s*((?:Why|What|How|Describe|Tell|Explain|When|Where|Who|Please)[^<]{5,200})\s*</gi)) {
-    const q = clean(m[1])
-    if (isGoodQuestion(q) && !seen.has(q)) {
-      seen.add(q)
-      questions.push(q)
-    }
-  }
-
-  return questions.slice(0, 12)
-}
-
-// ── Helpers ───────────────────────────────
-function clean(str) {
-  return String(str || '')
-    .replace(/<[^>]+>/g, ' ')  // strip HTML tags
-    .replace(/&amp;/g,  '&')
-    .replace(/&lt;/g,   '<')
-    .replace(/&gt;/g,   '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#\d+;/g, '')
-    .replace(/\s+/g,    ' ')
-    .replace(/[*:]+$/,  '')
-    .trim()
-}
-
-function isGoodQuestion(q) {
-  if (!q || q.length < 5 || q.length > 300) return false
-  // Skip labels that are clearly not questions
-  const skip = /^(submit|cancel|next|back|upload|browse|choose|select|click|yes|no|male|female|other|add|remove|\d+)$/i
-  if (skip.test(q)) return false
-  // Skip things that are clearly UI labels not questions
-  if (/^(first name|last name|full name|email|phone|mobile|address|city|state|country|pincode|zip)$/i.test(q)) return false
-  return true
+async function downloadSession(userId) {
+  try {
+    const { data, error } = await supabase.storage
+      .from('bavn-sessions').download(`${userId}/session.json`)
+    if (error || !data) return null
+    return JSON.parse(await data.text())
+  } catch(e) { return null }
 }

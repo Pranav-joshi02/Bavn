@@ -347,7 +347,7 @@ async function handleMessage(chatId, userId, text) {
     const { data: profile } = await supabase
       .from('profiles').select('*').eq('user_id', userId).single()
 
-    const { questions, error: scrapeError } = await scrapeFormQuestions(sess.formUrl)
+    const { questions, error: scrapeError } = await scrapeFormQuestions(sess.formUrl, userId)
 
     if (scrapeError || !questions.length) {
       // Could not scrape — ask user to type questions manually
